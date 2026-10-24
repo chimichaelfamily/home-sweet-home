@@ -1,10 +1,10 @@
-// Vercel function: fetches a private Google Calendar iCal link for the iPad
+// Vercel function: fetches a private Google or Outlook iCal link for the iPad
 // (browsers can't fetch it directly because of CORS). Only Google hosts allowed.
 export default async function handler(req, res) {
   try {
     const u = new URL(String(req.query.url || ''))
-    if (u.protocol !== 'https:' || u.hostname !== 'calendar.google.com') {
-      res.status(400).send('Only Google Calendar links are allowed')
+    if (u.protocol !== 'https:' || !['calendar.google.com','outlook.office365.com','outlook.office.com','outlook.live.com'].includes(u.hostname)) {
+      res.status(400).send('Only Google or Outlook calendar links are allowed')
       return
     }
     const r = await fetch(u.toString())

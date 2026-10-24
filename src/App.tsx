@@ -353,13 +353,13 @@ function CalendarSettings() {
   if (!links) return <div className="muted">Loading…</div>
   const save1 = async (p: 'linh' | 'michael', v: string) => {
     v = v.trim()
-    if (v && !/^https:\/\/calendar\.google\.com\/calendar\/ical\//.test(v)) { setMsg('That does not look like a Google "secret address in iCal format" link. It should start with https://calendar.google.com/calendar/ical/'); return }
+    if (v && !/^https:\/\/(calendar\.google\.com|outlook\.office365\.com|outlook\.office\.com|outlook\.live\.com)\//.test(v)) { setMsg('That does not look like a Google or Outlook calendar link (an .ics link).'); return }
     setMsg(''); await saveCalLink(p, v, links); setLinks({ ...links, [p]: v }); setMsg('Saved. The schedule refreshes within a few minutes, or reload the app.')
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
       <div style={{ fontSize: 30, fontWeight: 600 }}>Calendars</div>
-      <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>On a computer: Google Calendar → Settings → click your calendar on the left → "Integrate calendar" → copy <b>Secret address in iCal format</b>. Paste it here. It is read-only. Anyone with the link can see that calendar, so keep it private.</div>
+      <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>Google: on a computer, Google Calendar → Settings → click your calendar on the left → "Integrate calendar" → copy <b>Secret address in iCal format</b>. Paste it here. It is read-only. Outlook: Settings → Calendar → Shared calendars → Publish a calendar → ICS link. Anyone with a link can see that calendar, so keep it private.</div>
       {(['linh', 'michael'] as const).map(p => (
         <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <label style={{ fontWeight: 600 }}>{PEOPLE[p]}</label>
