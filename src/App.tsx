@@ -93,7 +93,7 @@ export default function App() {
         {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} mode={mode} setMode={setMode} openErrors={openErrors} clearOpen={() => setOpenErrors(false)} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Morning'], ['reminders', 'Reminders'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+        {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Affirmation'], ['reminders', 'Reminders'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
         ))}
         {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenErrors(true) }}>Something went wrong: see Settings → Logs</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
@@ -487,7 +487,7 @@ function Morning() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {picking && (() => { const a = items.find(x => x.id === picking); return a ? <PhotoPicker onPick={(img, credit) => { upsert({ ...a, img, sub: img && credit ? credit : '' }); setPicking(null) }} onClose={() => setPicking(null)} /> : null })()}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ fontSize: 36, fontWeight: 600 }}>Morning</div>
+        <div style={{ fontSize: 36, fontWeight: 600 }}>Affirmation</div>
         <div style={{ flex: 1 }} />
         <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>
         <PersonToggle who={who} setWho={w => { setWho(w); setI(0) }} />
@@ -500,8 +500,8 @@ function Morning() {
             {cur?.img && <Credit credit={cur.sub} />}
             <div style={{ display: 'flex', gap: 8 }}>{aff.map((_, k) => <div key={k} style={{ flex: 1, height: 6, borderRadius: 6, background: k <= i ? '#fff' : 'rgba(255,255,255,.35)' }} />)}</div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff', opacity: i === 0 ? .5 : 1 }} disabled={i === 0} onClick={() => setI(i - 1)}>Back</button>
-              <button className="btn" style={{ flex: 1, background: '#fff', color: 'var(--ink)' }} onClick={() => setI(i + 1 >= aff.length ? 0 : i + 1)}>{i + 1 >= aff.length ? 'Start again' : 'Next'}</button>
+              <button className="btn" style={{ minWidth: 120, background: 'rgba(20,12,30,.78)', border: '2px solid #fff', color: '#fff', textShadow: 'none', fontWeight: 700, opacity: i === 0 ? .55 : 1 }} disabled={i === 0} onClick={() => setI(i - 1)}>Back</button>
+              <button className="btn" style={{ flex: 1, background: '#fff', color: '#1F1F1E', textShadow: 'none', fontWeight: 700, boxShadow: '0 2px 10px rgba(0,0,0,.35)' }} onClick={() => setI(i + 1 >= aff.length ? 0 : i + 1)}>{i + 1 >= aff.length ? 'Start again' : 'Next'}</button>
             </div></>}
           {edit && <div className="scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {aff.map(a => <div key={a.id} style={{ display: 'flex', gap: 8 }}><input type="text" defaultValue={a.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.title) upsert({ ...a, title: v }) }} /><button className="btn small" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff' }} onClick={() => setPicking(a.id)}>{a.img ? 'Photo ✓' : 'Photo'}</button><button className="btn small" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff' }} onClick={() => remove(a.id)}>Remove</button></div>)}
@@ -683,11 +683,13 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
         
         <div style={{ flex: 1, position: 'relative', height: 60 }}>
           <div style={{ position: 'absolute', left: 0, right: 0, top: 20, height: 26, borderRadius: 13, background: 'var(--ground)', border: '1px solid var(--border)' }} />
-          <div style={{ position: 'absolute', left: 0, top: 20, height: 26, borderRadius: 13, width: `calc((100% - 64px) * ${frac} + 40px)`, background: me ? 'var(--accent)' : 'var(--blue-bd)' }} />
-          <div style={{ position: 'absolute', top: 14, left: `calc((100% - 64px) * ${frac})` }}>
+          <div style={{ position: 'absolute', left: 0, top: 20, height: 26, borderRadius: 13, width: `calc((100% - 94px) * ${frac} + 40px)`, background: me ? 'var(--accent)' : 'var(--blue-bd)' }} />
+          <div style={{ position: 'absolute', top: 14, left: `calc((100% - 94px) * ${frac})` }}>
             <svg width="64" height="34" viewBox="0 0 64 34" fill="none" aria-hidden="true"><path d="M4 22c0-3 2-5 5-5h6l8-9h17l9 9h8c4 0 7 2 7 6v3H4z" fill={me ? 'var(--ink)' : '#fff'} stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round" /><path d="M26 10h12l6 7H20z" fill="#fff" opacity=".85" /><circle cx="17" cy="27" r="6" fill="#1F1F1E" stroke="#fff" strokeWidth="2" /><circle cx="47" cy="27" r="6" fill="#1F1F1E" stroke="#fff" strokeWidth="2" /></svg>
           </div>
-          <div style={{ position: 'absolute', right: 0, top: 14, width: 10, height: 38, background: 'repeating-linear-gradient(#1F1F1E 0 6px,#fff 6px 12px)', border: '1px solid #1F1F1E' }} />
+          <div style={{ position: 'absolute', right: 0, top: 6, width: 26, height: 54, borderRadius: 8, background: '#2B2B2A', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', alignItems: 'center', padding: '3px 0' }} aria-hidden="true">
+            {[['#E5484D', pts < 50], ['#F5A623', pts >= 50 && pts < 100], ['#30A46C', pts >= 100]].map(([c, on], k) => <span key={k} style={{ width: 13, height: 13, borderRadius: '50%', background: c as string, opacity: on ? 1 : .28, boxShadow: on ? `0 0 8px ${c}` : 'none' }} />)}
+          </div>
         </div>
         <div style={{ width: 120, textAlign: 'right', flex: 'none' }}><span style={{ fontSize: 44, fontWeight: 600, letterSpacing: -1 }}>{pts}</span><span className="muted" style={{ fontSize: 16 }}> / 100</span></div>
       </div>
