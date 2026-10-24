@@ -177,8 +177,10 @@ function HabitChips({ s, apply, who }: { s: State; apply: (r: { state: State; op
 }
 function PersonToggle({ who, setWho }: { who: 'linh' | 'michael'; setWho: (w: 'linh' | 'michael') => void }) {
   return (
-    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
-      {(['linh', 'michael'] as const).map(p => <button key={p} onClick={() => setWho(p)} style={{ height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: who === p ? 'var(--accent)' : 'transparent', color: who === p ? 'var(--on-accent)' : 'var(--ink)' }}>{PEOPLE[p]}</button>)}
+    <div style={{ display: 'flex', gap: 6, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
+      {(['linh', 'michael'] as const).map(p => (
+        <button key={p} aria-label={PEOPLE[p]} aria-pressed={who === p} onClick={() => setWho(p)} style={{ padding: 3, borderRadius: 999, border: 'none', background: who === p ? 'var(--card)' : 'transparent', opacity: who === p ? 1 : .5, boxShadow: who === p ? '0 1px 6px rgba(0,0,0,.2)' : 'none' }}><Face who={p} size={40} /></button>
+      ))}
     </div>
   )
 }
@@ -420,7 +422,6 @@ function CalendarSettings() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
       <div style={{ fontSize: 30, fontWeight: 600 }}>Calendars</div>
-      <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>Household is the shared one. Michael's is his own. In Google Calendar on a computer: Settings → click the shared calendar on the left → "Integrate calendar" → copy <b>Secret address in iCal format</b>. Paste it here. It is read-only. Outlook: Settings → Calendar → Shared calendars → Publish a calendar → ICS link. Anyone with a link can see that calendar, so keep it private.</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <label style={{ fontWeight: 600 }}>Household calendar link</label>
         <input type="text" defaultValue={links.linh} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.linh) save1('linh', e.target.value) }} />
@@ -673,19 +674,31 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
   const month = new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
   const evs = s.events.filter(e => isoToYmd(e.created_at).slice(0, 7) === monthKey() && !e.undone_at && (filter === 'all' || e.person_id === filter)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
   const Lane = ({ who }: { who: 'linh' | 'michael' }) => {
-    const pts = tot[who]; const frac = Math.min(pts, 100) / 100; const me = who === 'linh'
+    const pts = tot[who]; const frac = Math.min(pts, 100) / 100; const me = who === 'linh'; const color = me ? 'var(--accent)' : 'var(--blue-bd)'
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, height: 84 }}>
         <Face who={who} size={72} />
         
         <div style={{ flex: 1, position: 'relative', height: 60 }}>
-          <div style={{ position: 'absolute', left: 0, right: 0, top: 20, height: 26, borderRadius: 13, background: 'var(--ground)', border: '1px solid var(--border)' }} />
-          <div style={{ position: 'absolute', left: 0, top: 20, height: 26, borderRadius: 13, width: `calc((100% - 94px) * ${frac} + 40px)`, background: me ? 'var(--accent)' : 'var(--blue-bd)' }} />
-          <div style={{ position: 'absolute', top: 14, left: `calc((100% - 94px) * ${frac})` }}>
-            <svg width="64" height="34" viewBox="0 0 64 34" fill="none" aria-hidden="true"><path d="M4 22c0-3 2-5 5-5h6l8-9h17l9 9h8c4 0 7 2 7 6v3H4z" fill={me ? 'var(--ink)' : '#fff'} stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round" /><path d="M26 10h12l6 7H20z" fill="#fff" opacity=".85" /><circle cx="17" cy="27" r="6" fill="#1F1F1E" stroke="#fff" strokeWidth="2" /><circle cx="47" cy="27" r="6" fill="#1F1F1E" stroke="#fff" strokeWidth="2" /></svg>
+          <div style={{ position: 'absolute', left: 0, right: 0, top: 16, height: 32, borderRadius: 16, background: '#3A3A3E', boxShadow: 'inset 0 2px 6px rgba(0,0,0,.4)' }} />
+          <div style={{ position: 'absolute', left: 16, right: 56, top: 31, height: 3, backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 14px, transparent 14px 28px)' }} />
+          <div style={{ position: 'absolute', left: 16, top: 30, height: 5, borderRadius: 3, width: `calc((100% - 106px) * ${frac} + 40px)`, background: color }} />
+          <div style={{ position: 'absolute', top: 8, left: `calc((100% - 106px) * ${frac})` }}>
+            <svg width="64" height="40" viewBox="0 0 64 40" fill="none" aria-hidden="true">
+              <ellipse cx="32" cy="36" rx="26" ry="3" fill="rgba(0,0,0,.35)" />
+              <path d="M3 28v-5c0-3 2-5 5-5.5l9-1.5 7-9c1.5-2 3.500-3 6-3h10c2.500 0 4.500 1 6 3l7 8 7 1.500c3 .5 5 2.500 5 5.500v6c0 1-1 2-2 2H5c-1.500 0-2-1-2-2z" fill={color} stroke="#1F1F1E" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M24 17l5-7c.800-1 1.800-1.500 3-1.500h8c1.200 0 2.200.5 3 1.500l5 7z" fill="#DFF1FF" stroke="#1F1F1E" strokeWidth="1.500" strokeLinejoin="round" />
+              <path d="M37 9v8" stroke="#1F1F1E" strokeWidth="1.500" />
+              <rect x="57" y="21" width="5" height="4" rx="1.500" fill="#FFE27A" stroke="#1F1F1E" strokeWidth="1" />
+              <circle cx="17" cy="30" r="6.500" fill="#1F1F1E" /><circle cx="17" cy="30" r="2.500" fill="#C9C9C6" />
+              <circle cx="47" cy="30" r="6.500" fill="#1F1F1E" /><circle cx="47" cy="30" r="2.500" fill="#C9C9C6" />
+            </svg>
           </div>
-          <div style={{ position: 'absolute', right: 0, top: 6, width: 26, height: 54, borderRadius: 8, background: '#2B2B2A', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', alignItems: 'center', padding: '3px 0' }} aria-hidden="true">
-            {[['#E5484D', pts < 50], ['#F5A623', pts >= 50 && pts < 100], ['#30A46C', pts >= 100]].map(([c, on], k) => <span key={k} style={{ width: 13, height: 13, borderRadius: '50%', background: c as string, opacity: on ? 1 : .28, boxShadow: on ? `0 0 8px ${c}` : 'none' }} />)}
+          <div style={{ position: 'absolute', right: 8, top: 0, width: 34, height: 64, display: 'flex', flexDirection: 'column', alignItems: 'center' }} aria-hidden="true">
+            <div style={{ width: 34, height: 52, borderRadius: 10, background: '#2B2B2A', border: '2px solid #1A1A19', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', alignItems: 'center', boxShadow: '0 2px 6px rgba(0,0,0,.35)' }}>
+              {[['#FF4D4F', pts < 50], ['#FFB020', pts >= 50 && pts < 100], ['#2FCB75', pts >= 100]].map(([c, on], k) => <span key={k} style={{ width: 12, height: 12, borderRadius: '50%', background: on ? (c as string) : '#555', boxShadow: on ? `0 0 10px 2px ${c}` : 'none' }} />)}
+            </div>
+            <div style={{ width: 5, height: 12, background: '#2B2B2A' }} />
           </div>
         </div>
         <div style={{ width: 120, textAlign: 'right', flex: 'none' }}><span style={{ fontSize: 44, fontWeight: 600, letterSpacing: -1 }}>{pts}</span><span className="muted" style={{ fontSize: 16 }}> / 100</span></div>
@@ -700,7 +713,7 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 24, fontWeight: 600 }}>History</div>
           <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
-            {(['all', 'linh', 'michael'] as const).map(f => <button key={f} onClick={() => setFilter(f)} style={{ height: 44, padding: '0 22px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 16, background: filter === f ? 'var(--accent)' : 'transparent', color: filter === f ? 'var(--on-accent)' : 'var(--ink)' }}>{f === 'all' ? 'All' : PEOPLE[f]}</button>)}
+            {(['all', 'linh', 'michael'] as const).map(f => <button key={f} onClick={() => setFilter(f)} aria-label={f === 'all' ? 'All' : PEOPLE[f]} style={{ height: 44, padding: '0 20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 16, background: filter === f ? 'var(--accent)' : 'transparent', color: filter === f ? 'var(--on-accent)' : 'var(--ink)' }}>{f === 'all' ? 'All' : <Face who={f} size={30} />}</button>)}
           </div>
         </div>
         <div className="scroll" style={{ flex: 1 }}>
@@ -772,7 +785,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['habits', 'Habits'], ['rules', `Rules (${s.rules.length})`], ['products', 'Pantry'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
+          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['habits', 'Habits'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>

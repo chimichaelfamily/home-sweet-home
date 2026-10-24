@@ -43,7 +43,6 @@ export function FaceSettings() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
       <div style={{ fontSize: 30, fontWeight: 600 }}>Faces</div>
-      <div className="muted" style={{ fontSize: 15 }}>Your photos show on the points race and the points counters instead of names. They are cropped to a circle.</div>
       {(['linh', 'michael'] as const).map(w => (
         <div key={w} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <Face who={w} size={72} />

@@ -54,7 +54,7 @@ export function Products() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 30, fontWeight: 600 }}>Products</div>
+        <div style={{ fontSize: 30, fontWeight: 600 }}>Expired products</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{['All', ...PLACES].map(p => <button key={p} onClick={() => setFilter(p)} style={{ height: 40, padding: '0 14px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: '1.5px solid var(--mborder)', background: filter === p ? 'var(--accent)' : 'transparent', color: filter === p ? 'var(--on-accent)' : 'var(--ink)' }}>{p}</button>)}</div>
         <div style={{ flex: 1, minWidth: 0 }} />
         <button className="btn small outline" style={{ whiteSpace: 'nowrap' }} onClick={() => setForm(blank)}>Type it in</button>

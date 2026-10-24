@@ -142,6 +142,7 @@ ${withGoals ? goalsText() : ''}`
           </div>
           <div className="card" style={{ flex: 1, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}><span style={{ fontSize: 40, fontWeight: 700 }}>{w.open.length}</span><span style={{ fontSize: 17, fontWeight: 600 }}>open tasks</span></div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>{w.open.slice(0, 8).map(n => <Chip key={n}>{n}</Chip>)}{w.open.length > 8 && <Chip>+{w.open.length - 8}</Chip>}</div>
           </div>
         </div>
         <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
