@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { emptyState, load, save, supabase, usingDatabase } from './lib/backend.ts'
+import { emptyState, load, loadCalLinks, saveCalLink, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
+import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
 import { addMonthKey, daysInMonth, longestInMonth, monthLabel, streak, weatherText } from './lib/habits.ts'
 import * as A from './lib/actions.ts'
-import { addDays, diffDays, fmtLong, fmtShort, isoToYmd, today } from './lib/dates.ts'
+import { addDays, diffDays, dowShort, fmtLong, fmtShort, isoToYmd, today } from './lib/dates.ts'
 import { daysLate, headsUps, nextDue, status, type Rule, type Unit } from './lib/rules.ts'
 import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Who } from './lib/types.ts'
 
@@ -284,15 +285,88 @@ function Home({ s, apply, onAdd, onTick, goReminders }: { s: State; apply: (r: {
             </div>
           ) : <div style={{ fontSize: 16, opacity: .9 }}>Melbourne weather loading…</div>}
         </div>
-        <div className="card" style={{ flex: 1, padding: '20px 28px' }}>
-          <div style={{ fontSize: 24, fontWeight: 600 }}>Schedule</div>
-          <div className="muted" style={{ marginTop: 10, fontSize: 17, lineHeight: 1.5 }}>Your Google Calendars (Linh Chi | Michael) will appear here once we connect them. That's the next phase.</div>
-        </div>
+        <Schedule />
         <div className="card" style={{ flex: 'none', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 24, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
           <HabitChips s={s} apply={apply} who={hwho} />
         </div>
       </div>
+    </div>
+  )
+}
+
+function Schedule() {
+  const t = today()
+  const days = scheduleDays(t)
+  const [links, setLinks] = useState<CalLinks | null>(null)
+  const [events, setEvents] = useState<CalEvent[]>([])
+  const [show, setShow] = useState({ linh: true, michael: true })
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    let off = false
+    const go = async () => {
+      try {
+        const l = await loadCalLinks(); if (off) return
+        setLinks(l)
+        const all: CalEvent[] = []
+        for (const p of ['linh', 'michael'] as const) if (l[p]) all.push(...await fetchCalendar(l[p], p, days[0], days[days.length - 1]))
+        if (!off) { setEvents(all); setErr('') }
+      } catch { if (!off) setErr('Could not refresh the calendar. Showing the last update.') }
+    }
+    go(); const id = setInterval(go, 10 * 60000)
+    return () => { off = true; clearInterval(id) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t])
+  const connected = links && (links.linh || links.michael)
+  return (
+    <div className="card" style={{ flex: 1, padding: '16px 24px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div style={{ fontSize: 24, fontWeight: 600 }}>Schedule</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {(['linh', 'michael'] as const).map(p => <button key={p} aria-pressed={show[p]} onClick={() => setShow({ ...show, [p]: !show[p] })} style={{ height: 36, padding: '0 14px', borderRadius: 999, fontWeight: 600, fontSize: 14, border: `1.5px solid ${p === 'linh' ? 'var(--accent)' : 'var(--blue-bd)'}`, background: show[p] ? (p === 'linh' ? 'var(--accent)' : 'var(--blue-bd)') : 'transparent', color: show[p] ? '#fff' : 'var(--ink)' }}>{PEOPLE[p]}</button>)}
+        </div>
+      </div>
+      <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
+        {links && !connected && <div className="muted" style={{ fontSize: 16, lineHeight: 1.5 }}>No calendars yet. Open Settings → Calendars and paste each person's private Google Calendar link.</div>}
+        {connected && days.map(d => {
+          const ev = events.filter(e => e.day === d && show[e.person]).sort((a, b) => a.sort - b.sort)
+          return (
+            <div key={d} style={{ display: 'flex', gap: 14, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: 62, flex: 'none', fontWeight: 700, fontSize: 15, color: d === t ? 'var(--accent)' : 'var(--ink)' }}>{d === t ? 'Today' : dowShort(d)}<div className="muted" style={{ fontSize: 12, fontWeight: 500 }}>{fmtShort(d)}</div></div>
+              <div style={{ flex: 1 }}>
+                {ev.length === 0 && <div className="muted" style={{ fontSize: 14, padding: '4px 0' }}>Nothing planned</div>}
+                {ev.map((e, i) => <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 16, padding: '3px 0' }}><span style={{ width: 8, height: 8, borderRadius: '50%', flex: 'none', background: e.person === 'linh' ? 'var(--accent)' : 'var(--blue-bd)' }} /><span className="muted" style={{ width: 64, flex: 'none', fontSize: 14 }}>{e.time}</span><span style={{ fontWeight: 600 }}>{e.title}</span></div>)}
+              </div>
+            </div>
+          )
+        })}
+        {err && <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>{err}</div>}
+      </div>
+    </div>
+  )
+}
+
+function CalendarSettings() {
+  const [links, setLinks] = useState<CalLinks | null>(null)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { loadCalLinks().then(setLinks).catch(() => setLinks({ linh: '', michael: '' })) }, [])
+  if (!links) return <div className="muted">Loading…</div>
+  const save1 = async (p: 'linh' | 'michael', v: string) => {
+    v = v.trim()
+    if (v && !/^https:\/\/calendar\.google\.com\/calendar\/ical\//.test(v)) { setMsg('That does not look like a Google "secret address in iCal format" link. It should start with https://calendar.google.com/calendar/ical/'); return }
+    setMsg(''); await saveCalLink(p, v, links); setLinks({ ...links, [p]: v }); setMsg('Saved. The schedule refreshes within a few minutes, or reload the app.')
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
+      <div style={{ fontSize: 30, fontWeight: 600 }}>Calendars</div>
+      <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>On a computer: Google Calendar → Settings → click your calendar on the left → "Integrate calendar" → copy <b>Secret address in iCal format</b>. Paste it here. It is read-only. Anyone with the link can see that calendar, so keep it private.</div>
+      {(['linh', 'michael'] as const).map(p => (
+        <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontWeight: 600 }}>{PEOPLE[p]}</label>
+          <input type="text" defaultValue={links[p]} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links[p]) save1(p, e.target.value) }} />
+        </div>
+      ))}
+      {msg && <div style={{ fontSize: 14 }}>{msg}</div>}
     </div>
   )
 }
@@ -438,7 +512,7 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
 }
 
 function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'backup'>('look')
+  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'calendars' | 'backup'>('look')
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
   const [sel, setSel] = useState<string | null>(null)
@@ -456,7 +530,7 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['backup', 'Backup']] as const).map(([id, l]) => (
+          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['calendars', 'Calendars'], ['backup', 'Backup']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
@@ -524,6 +598,7 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
               <div className="muted" style={{ fontSize: 14 }}>Removing a habit hides it. Its past days are kept.</div>
             </div>
           )}
+          {sec === 'calendars' && <CalendarSettings />}
           {sec === 'backup' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 520 }}>
               <div style={{ fontSize: 30, fontWeight: 600 }}>Backup</div>

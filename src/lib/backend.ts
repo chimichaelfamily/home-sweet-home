@@ -69,3 +69,19 @@ export async function save(state: State, ops: Op[]): Promise<string | null> {
   }
   return null
 }
+
+export type CalLinks = { linh: string; michael: string }
+const CAL_KEY = 'home-sweet-home.cal.v1'
+export async function loadCalLinks(): Promise<CalLinks> {
+  const out: CalLinks = { linh: '', michael: '' }
+  if (supabase) {
+    const { data } = await supabase.from('calendars').select('person_id,url')
+    for (const r of data ?? []) if (r.person_id === 'linh' || r.person_id === 'michael') out[r.person_id as 'linh' | 'michael'] = r.url
+    return out
+  }
+  try { return { ...out, ...JSON.parse(localStorage.getItem(CAL_KEY) || '{}') } } catch { return out }
+}
+export async function saveCalLink(person: 'linh' | 'michael', url: string, all: CalLinks) {
+  if (supabase) { await supabase.from('calendars').upsert({ person_id: person, url }, { onConflict: 'person_id' }); return }
+  try { localStorage.setItem(CAL_KEY, JSON.stringify({ ...all, [person]: url })) } catch { /* ignore */ }
+}

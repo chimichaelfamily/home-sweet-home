@@ -59,3 +59,16 @@ let tg = toggleHabit(h.state, hid, '2026-10-24')
 assert.equal(tg.state.habitLogs.length, 1)
 assert.equal(toggleHabit(tg.state, hid, '2026-10-24').state.habitLogs.length, 0)
 console.log('habit tests passed')
+
+import { parseIcs, scheduleDays } from './calendar.ts'
+{
+  assert.deepStrictEqual(scheduleDays('2026-10-24'), ['2026-10-24', '2026-10-25']) // Sat
+  assert.strictEqual(scheduleDays('2026-10-25').length, 8) // Sun: today + next week
+  assert.strictEqual(scheduleDays('2026-10-25')[1], '2026-10-26')
+  assert.deepStrictEqual(scheduleDays('2026-10-28')[0], '2026-10-26') // Wed -> Mon..Sun
+  const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:1\r\nDTSTART;VALUE=DATE:20261027\r\nDTEND;VALUE=DATE:20261028\r\nSUMMARY:Holiday\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:2\r\nDTSTART:20261026T230000Z\r\nDTEND:20261027T000000Z\r\nRRULE:FREQ=DAILY;COUNT=3\r\nSUMMARY:Standup\r\nEND:VEVENT\r\nEND:VCALENDAR`
+  const ev = parseIcs(ics, 'linh', '2026-10-26', '2026-11-01')
+  assert.ok(ev.some(e => e.title === 'Holiday' && e.day === '2026-10-27' && e.allDay))
+  assert.strictEqual(ev.filter(e => e.title === 'Standup').length, 3)
+  console.log('calendar tests passed')
+}
