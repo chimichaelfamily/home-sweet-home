@@ -126,3 +126,8 @@ export function deleteTask(s: State, id: string): Result {
 export function unsnooze(s: State, ruleId: string): Result {
   return { state: { ...s, snoozes: s.snoozes.filter(z => z.rule_id !== ruleId) }, ops: [{ table: 'snoozes', type: 'delete', match: { rule_id: ruleId } }] }
 }
+
+/** Remove a rule completely. Points already earned stay in the history. */
+export function deleteRule(s: State, id: string): Result {
+  return { state: { ...s, rules: s.rules.filter(r => r.id !== id), snoozes: s.snoozes.filter(z => z.rule_id !== id) }, ops: [{ table: 'rules', type: 'delete', match: { id } }] }
+}

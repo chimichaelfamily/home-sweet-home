@@ -96,7 +96,7 @@ export default function App() {
         {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Morning'], ['reminders', 'Reminders'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
         ))}
-        {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenErrors(true) }}>Something went wrong: see Settings → Errors</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
+        {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenErrors(true) }}>Something went wrong: see Settings → Logs</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
       </nav>
       {adding && <AddTask onClose={() => setAdding(false)} onAdd={async (t, sz) => { setAdding(false); if (stateRef.current) await apply(A.addTask(stateRef.current, t, sz)) }} />}
       {editing && (() => {
@@ -260,12 +260,20 @@ function HabitRow({ name, n, done, dayKey, today: t, streakN, onToggle }: { name
   )
 }
 
+const Pencil = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" /></svg>
+const Trash = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
+
 function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onEdit: (id: string) => void; onEditRule: (id: string) => void; onAdd: () => void; onTick: (p: NonNullable<Pending>) => void; goReminders: () => void }) {
   const t = today()
   const now = new Date()
   const totals = monthTotals(s)
   const wx = useWeather()
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
+  const untick = (kind: 'task' | 'rule', id: string) => {
+    const ev = s.events.filter(e => !e.undone_at && (kind === 'task' ? e.task_id === id : e.rule_id === id && isoToYmd(e.created_at) === t)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0]
+    if (ev) apply(A.undo(s, ev.batch))
+  }
+  const delTask = (id: string, title: string) => { if (confirm(`Delete "${title}"?`)) apply(A.deleteTask(s, id)) }
   const doneRulesToday = [...new Map(s.events.filter(e => e.rule_id && !e.undone_at && isoToYmd(e.created_at) === t).map(e => [e.rule_id!, e])).values()]
   const todayTasks = s.tasks.filter(x => x.due_date <= t && (!x.done_at || isoToYmd(x.done_at) === t))
   const later = s.tasks.filter(x => x.due_date > t && !x.done_at)
@@ -287,18 +295,19 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
           {todayTasks.length === 0 && <div className="muted" style={{ padding: '14px 0', fontSize: 17 }}>Nothing yet. Add a task below.</div>}
           {todayTasks.map(x => (
             <div className="row" key={x.id}>
-              <button className={'circle' + (x.done_at ? ' done' : '')} aria-label={x.done_at ? 'Done' : `Tick ${x.title}`} disabled={!!x.done_at} onClick={() => onTick({ kind: 'task', id: x.id, title: x.title, size: x.size })}>{x.done_at && <Check />}</button>
+              <button className={'circle' + (x.done_at ? ' done' : '')} aria-label={x.done_at ? `Undo ${x.title}` : `Tick ${x.title}`} onClick={() => x.done_at ? untick('task', x.id) : onTick({ kind: 'task', id: x.id, title: x.title, size: x.size })}>{x.done_at && <Check />}</button>
               <div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', ...(x.done_at ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{x.title}</div>
               {personTag(x.assignee) && <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>{personTag(x.assignee)}</span>}
               <span className={'pill ' + x.size}>+{POINTS[x.size]}</span>
-              <button className="more" aria-label={`Options for ${x.title}`} onClick={() => onEdit(x.id)}>⋯</button>
+              <button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button>
+              <button className="more" aria-label={`Delete ${x.title}`} onClick={() => delTask(x.id, x.title)}><Trash /></button>
             </div>
           ))}
           {doneRulesToday.map(e => (
             <div className="row" key={e.id}>
-              <button className="circle done" aria-label="Done" onClick={() => onEditRule(e.rule_id!)}><Check /></button>
+              <button className="circle done" aria-label={`Undo ${e.title}`} onClick={() => untick('rule', e.rule_id!)}><Check /></button>
               <div role="button" onClick={() => onEditRule(e.rule_id!)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', textDecoration: 'line-through', color: 'var(--muted)' }}>{e.title}</div>
-              <button className="more" aria-label={`Options for ${e.title}`} onClick={() => onEditRule(e.rule_id!)}>⋯</button>
+              <button className="more" aria-label={`Edit ${e.title}`} onClick={() => onEditRule(e.rule_id!)}><Pencil /></button>
             </div>
           ))}
           {over.length > 0 && (
@@ -312,14 +321,14 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
                   <button className="circle late" style={{ width: 30, height: 30 }} aria-label={`Tick ${r.name}`} onClick={() => onTick({ kind: 'rule', id: r.id, title: r.name, size: r.size })} />
                   <div role="button" onClick={() => onEditRule(r.id)} style={{ flex: 1, fontSize: 19, fontWeight: 500, cursor: 'pointer' }}>{r.name}</div>
                   <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--late)' }}>{daysLate(r, t)} days late</span>
-                  <button className="more" aria-label={`Options for ${r.name}`} onClick={() => onEditRule(r.id)}>⋯</button>
+                  <button className="more" aria-label={`Edit ${r.name}`} onClick={() => onEditRule(r.id)}><Pencil /></button>
                 </div>
               ))}
             </>
           )}
           {later.length > 0 && <div className="head" style={{ marginTop: 12 }}>LATER</div>}
           {later.map(x => (
-            <div className="row" key={x.id}><div className="circle" /><div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer' }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span><button className="more" aria-label={`Options for ${x.title}`} onClick={() => onEdit(x.id)}>⋯</button></div>
+            <div className="row" key={x.id}><div className="circle" /><div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer' }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span><button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button><button className="more" aria-label={`Delete ${x.title}`} onClick={() => delTask(x.id, x.title)}><Trash /></button></div>
           ))}
         </div>
         <button onClick={onAdd} style={{ marginTop: 8, height: 56, borderRadius: 16, border: '1.5px dashed var(--mborder)', background: 'transparent', fontSize: 19, fontWeight: 600 }}>+ Add task</button>
@@ -549,7 +558,6 @@ function EditTask({ t, done, onSave, onDelete, onUndo, onClose }: { t: Task; don
         {(['baby', 'biggie'] as Size[]).map(z => <button key={z} onClick={() => setSize(z)} style={{ flex: 1, height: 56, borderRadius: 18, fontSize: 18, fontWeight: 600, border: '2px solid ' + (size === z ? 'var(--accent)' : 'var(--border)'), background: size === z ? 'var(--accent)' : 'var(--card)', color: size === z ? 'var(--on-accent)' : 'var(--ink)' }}>{SIZE_LABEL[z]} · +{POINTS[z]}</button>)}
       </div>
       {done && <div className="muted" style={{ fontSize: 15 }}>This task is done. Changing its size also changes the points already given.</div>}
-      {done && <button className="btn outline" onClick={onUndo}>Mark as not done (take points back)</button>}
       <div style={{ display: 'flex', gap: 10 }}>
         <button className="btn outline" onClick={() => { if (confirm('Delete this task' + (done ? ' and its points' : '') + '?')) onDelete() }}>Delete</button>
         <div style={{ flex: 1 }} />
@@ -570,7 +578,6 @@ function EditRuleQuick({ r, canUndo, onSave, onUndo, onClose }: { r: Rule; canUn
       <div style={{ display: 'flex', gap: 10 }}>
         {(['baby', 'biggie'] as Size[]).map(z => <button key={z} onClick={() => setSize(z)} style={{ flex: 1, height: 56, borderRadius: 18, fontSize: 18, fontWeight: 600, border: '2px solid ' + (size === z ? 'var(--accent)' : 'var(--border)'), background: size === z ? 'var(--accent)' : 'var(--card)', color: size === z ? 'var(--on-accent)' : 'var(--ink)' }}>{SIZE_LABEL[z]} · +{POINTS[z]}</button>)}
       </div>
-      {canUndo && <button className="btn outline" onClick={onUndo}>Mark as not done (take points back)</button>}
       <div style={{ display: 'flex', gap: 10 }}>
         <div style={{ flex: 1 }} />
         <button className="btn ghost" onClick={onClose}>Cancel</button>
@@ -601,6 +608,7 @@ function WhoDid({ p, onPick, onClose }: { p: NonNullable<Pending>; onPick: (w: W
 function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onDone: (p: NonNullable<Pending>) => void }) {
   const t = today()
   const [menu, setMenu] = useState<string | null>(null)
+  const [pick, setPick] = useState('')
   const snoozedUntil = (id: string) => s.snoozes.find(z => z.rule_id === id && z.until > t)?.until
   const kept = s.rules.filter(r => r.keep && r.last_done)
   const snoozed = kept.filter(r => snoozedUntil(r.id)).sort((a, b) => (snoozedUntil(a.id)! < snoozedUntil(b.id)! ? -1 : 1))
@@ -611,13 +619,13 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
   const coming = rest.filter(r => diffDays(nextDue(r)!, t) <= 14)
   const later = rest.filter(r => diffDays(nextDue(r)!, t) > 14)
   const snoozeTo = (id: string, d: string) => { setMenu(null); apply(A.snooze(s, id, d)) }
-  const Row = ({ r, isOver }: { r: Rule; isOver: boolean }) => {
+  const row = (r: Rule, isOver: boolean) => {
     const due = nextDue(r)!
     return (
-      <div className="row" style={{ minHeight: 62, position: 'relative' }}>
+      <div className="row" key={r.id} style={{ minHeight: 62, position: 'relative' }}>
         <div style={{ flex: 1, minWidth: 0, fontSize: 20, fontWeight: 500 }}>{r.name}</div>
         <div style={{ width: 170, fontSize: 16, fontWeight: 500, color: isOver ? 'var(--late)' : 'var(--muted)' }}>{isOver ? `${daysLate(r, t)} days late` : fmtLong(due)}</div>
-        {isOver && <button className="btn small outline" onClick={() => setMenu(menu === r.id ? null : r.id)}>Snooze</button>}
+        {isOver && <button className="btn small outline" onClick={() => { setPick(''); setMenu(menu === r.id ? null : r.id) }}>Snooze</button>}
         <button className="btn small" onClick={() => onDone({ kind: 'rule', id: r.id, title: r.name, size: r.size })}>Done</button>
         {menu === r.id && (
           <div className="card" style={{ position: 'absolute', right: 90, top: 52, zIndex: 5, padding: 10, display: 'flex', flexDirection: 'column', gap: 6, boxShadow: '0 8px 24px rgba(0,0,0,.2)', width: 220 }}>
@@ -625,23 +633,25 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
               <button key={l as string} className="btn small outline" onClick={() => snoozeTo(r.id, addDays(t, d as number))}>{l}</button>
             ))}
             <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>Or pick a day</div>
-            <input type="date" min={addDays(t, 1)} aria-label="Snooze until" onChange={e => e.target.value && snoozeTo(r.id, e.target.value)} style={{ height: 48, fontSize: 16, borderRadius: 12, border: '2px solid var(--border)', padding: '0 8px' }} />
+            <input type="date" min={addDays(t, 1)} value={pick} aria-label="Snooze until" onChange={e => setPick(e.target.value)} style={{ height: 48, fontSize: 16, borderRadius: 12, border: '2px solid var(--border)', padding: '0 8px' }} />
+            <button className="btn small" disabled={!pick} onClick={() => snoozeTo(r.id, pick)}>Snooze to this day</button>
+            <button className="btn small ghost" onClick={() => setMenu(null)}>Cancel</button>
           </div>
         )}
       </div>
     )
   }
-  const Section = ({ label, list, isOver, color }: { label: string; list: Rule[]; isOver: boolean; color?: string }) => list.length ? (
-    <><div className="head" style={{ margin: '14px 0 2px', color }}>{label}</div>{list.map(r => <Row key={r.id} r={r} isOver={isOver} />)}</>
+  const section = (label: string, list: Rule[], isOver: boolean, color?: string) => list.length ? (
+    <><div className="head" style={{ margin: '14px 0 2px', color }}>{label}</div>{list.map(r => row(r, isOver))}</>
   ) : null
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Reminders</div><div className="muted" style={{ fontSize: 17 }}>{over.length} overdue · {coming.length} coming up</div></div>
       <div className="card scroll" style={{ flex: 1, padding: '6px 28px 24px' }}>
-        <Section label="OVERDUE · MOST LATE FIRST" list={over} isOver color="var(--late)" />
-        <Section label="COMING UP · NEXT 2 WEEKS" list={coming} isOver={false} />
+        {section('OVERDUE · MOST LATE FIRST', over, true, 'var(--late)')}
+        {section('COMING UP · NEXT 2 WEEKS', coming, false)}
         {over.length === 0 && coming.length === 0 && <div className="muted" style={{ padding: '18px 0', fontSize: 17 }}>Nothing overdue and nothing due in the next 2 weeks.</div>}
-        {all && <Section label="LATER" list={later} isOver={false} />}
+        {all && section('LATER', later, false)}
         {later.length > 0 && <button className="btn small outline" style={{ marginTop: 16 }} onClick={() => setAll(!all)}>{all ? 'Show less' : `See all (${later.length} more)`}</button>}
         {snoozed.length > 0 && (
           <>
@@ -664,7 +674,7 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
   const [filter, setFilter] = useState<'all' | 'linh' | 'michael'>('all')
   const tot = monthTotals(s)
   const month = new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
-  const evs = s.events.filter(e => isoToYmd(e.created_at).slice(0, 7) === monthKey() && (filter === 'all' || e.person_id === filter)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+  const evs = s.events.filter(e => isoToYmd(e.created_at).slice(0, 7) === monthKey() && !e.undone_at && (filter === 'all' || e.person_id === filter)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
   const Lane = ({ who }: { who: 'linh' | 'michael' }) => {
     const pts = tot[who]; const frac = Math.min(pts, 100) / 100; const me = who === 'linh'
     return (
@@ -710,17 +720,42 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
   )
 }
 
+function RuleDialog({ rule, onSave, onDelete, onClose }: { rule: Rule | null; onSave: (d: Omit<Rule, 'id'>) => void; onDelete: () => void; onClose: () => void }) {
+  const [d, setD] = useState<Omit<Rule, 'id'>>(rule ? { ...rule } : { name: '', category: 'Home', action: 'Clean', every_n: 1, unit: 'months', applies_to: 'Both', keep: true, last_done: today(), size: 'baby' })
+  const set = (p: Partial<Omit<Rule, 'id'>>) => setD({ ...d, ...p })
+  return (
+    <div className="overlay" onClick={onClose}><div className="dialog" style={{ width: 480, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div style={{ fontSize: 30, fontWeight: 600 }}>{rule ? 'Edit rule' : 'New rule'}</div>
+      <label htmlFor="rn">Name</label><input id="rn" type="text" value={d.name} autoFocus={!rule} placeholder="e.g. Clean the oven" onChange={e => set({ name: e.target.value })} />
+      <label htmlFor="rc">Category</label><input id="rc" type="text" value={d.category} onChange={e => set({ category: e.target.value })} />
+      <label htmlFor="re">Repeat every</label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input id="re" type="number" min={1} value={d.every_n} style={{ width: 90 }} onChange={e => set({ every_n: Math.max(1, Number(e.target.value) || 1) })} />
+        <select aria-label="Unit" value={d.unit} onChange={e => set({ unit: e.target.value as Unit })}>{['days', 'weeks', 'months', 'years'].map(u => <option key={u}>{u}</option>)}</select>
+      </div>
+      <label htmlFor="rl">Last done</label><input id="rl" type="date" value={d.last_done ?? ''} onChange={e => set({ last_done: e.target.value || null })} />
+      <label>Points when done</label>
+      <div style={{ display: 'flex', gap: 8 }}>{(['baby', 'biggie'] as Size[]).map(sz => <button key={sz} className={'btn small ' + (d.size === sz ? '' : 'outline')} onClick={() => set({ size: sz })}>{SIZE_LABEL[sz]} +{POINTS[sz]}</button>)}</div>
+      <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 16 }}><input type="checkbox" checked={d.keep} style={{ width: 24, height: 24 }} onChange={e => set({ keep: e.target.checked })} /> Show in Reminders</label>
+      <div style={{ display: 'flex', gap: 10 }}>
+        {rule && <button className="btn outline" onClick={onDelete}>Delete</button>}
+        <div style={{ flex: 1 }} />
+        <button className="btn ghost" onClick={onClose}>Cancel</button>
+        <button className="btn" disabled={!d.name.trim()} onClick={() => onSave({ ...d, name: d.name.trim() })}>Save</button>
+      </div>
+    </div></div>
+  )
+}
+
 function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearOpen }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void; mode: 'light' | 'dark' | 'auto'; setMode: (m: 'light' | 'dark' | 'auto') => void; openErrors: boolean; clearOpen: () => void }) {
   const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'faces' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
+  const [ruleDlg, setRuleDlg] = useState<Rule | 'new' | null>(null)
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
   const [errList, setErrList] = useState(getErrors())
   useEffect(() => { if (openErrors) { setSec('errors'); clearOpen() } }, [openErrors, clearOpen])
   useEffect(() => { if (sec === 'errors') markSeen(); const f = () => setErrList(getErrors()); window.addEventListener('hsh-errors', f); return () => window.removeEventListener('hsh-errors', f) }, [sec])
-  const [sel, setSel] = useState<string | null>(null)
   const t = today()
-  const rule = s.rules.find(r => r.id === sel) ?? null
-  const set = (patch: Partial<Rule>) => rule && apply(A.updateRule(s, rule.id, patch))
   const sorted = useMemo(() => [...s.rules].sort((a, b) => (nextDue(a) ?? 'z') < (nextDue(b) ?? 'z') ? -1 : 1), [s.rules])
   const label: Record<string, string> = { overdue: 'Overdue', today: 'Due today', soon: 'Within 30 days', ok: 'OK', skipped: 'Skipped', notstarted: 'Not started' }
   const [bk, setBk] = useState(lastBackup())
@@ -732,17 +767,20 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
   }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {ruleDlg && <RuleDialog key={ruleDlg === 'new' ? 'new' : ruleDlg.id} rule={ruleDlg === 'new' ? null : ruleDlg} onClose={() => setRuleDlg(null)}
+        onSave={d => { setRuleDlg(null); apply(ruleDlg === 'new' ? A.addRule(s, d) : A.updateRule(s, ruleDlg.id, d)) }}
+        onDelete={() => { if (ruleDlg !== 'new' && confirm(`Delete "${ruleDlg.name}"?`)) { setRuleDlg(null); apply(A.deleteRule(s, ruleDlg.id)) } }} />}
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['faces', 'Faces'], ['calendars', 'Calendars'], ['products', 'Products'], ['backup', 'Backup'], ['errors', 'Errors']] as const).map(([id, l]) => (
+          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['habits', 'Habits'], ['rules', `Rules (${s.rules.length})`], ['products', 'Pantry'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
         <div className="card scroll" style={{ flex: 1, minWidth: 0, padding: 26 }}>
           {sec === 'look' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ fontSize: 30, fontWeight: 600 }}>Appearance</div>
+              <div style={{ fontSize: 30, fontWeight: 600 }}>Theme</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 600, fontSize: 17 }}>Brightness</span>
                 {([['light', 'Light'], ['dark', 'Dark'], ['auto', 'Dark after sunset']] as const).map(([k, l]) => <button key={k} aria-pressed={mode === k} onClick={() => setMode(k)} style={{ height: 44, padding: '0 18px', borderRadius: 999, fontWeight: 600, fontSize: 16, border: '1.5px solid var(--mborder)', background: mode === k ? 'var(--accent)' : 'transparent', color: mode === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
@@ -761,34 +799,18 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
             </div>
           )}
           {sec === 'rules' && (
-            <div style={{ display: 'flex', gap: 20 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}><div style={{ fontSize: 30, fontWeight: 600 }}>Rules</div>
-                  <button className="btn small" onClick={async () => { const r = await apply(A.addRule(s, { name: 'New rule', category: 'Home', action: 'Clean', every_n: 1, unit: 'months', applies_to: 'Both', keep: true, last_done: t, size: 'baby' }) as never) as { state: State }; setSel(r.state.rules[r.state.rules.length - 1].id) }}>+ Add rule</button></div>
-                {sorted.map(r => (
-                  <button key={r.id} onClick={() => setSel(r.id)} className="row" style={{ width: '100%', border: 'none', borderBottom: '1px solid var(--row)', background: sel === r.id ? 'var(--faint)' : 'transparent', textAlign: 'left', padding: '0 8px', borderRadius: 12, minHeight: 56 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 18, fontWeight: 600 }}>{r.name}</div><div className="muted" style={{ fontSize: 13 }}>{r.category} · every {r.every_n} {r.unit}</div></div>
-                    <div style={{ width: 100, fontSize: 15 }}>{nextDue(r) ? fmtShort(nextDue(r)!) : '—'}</div>
-                    <span className="pill" style={{ background: status(r, t) === 'overdue' ? 'var(--accent)' : 'var(--faint)', color: status(r, t) === 'overdue' ? 'var(--on-accent)' : 'var(--muted)', border: '1px solid var(--border)' }}>{label[status(r, t)]}</span>
-                  </button>
-                ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 30, fontWeight: 600 }}>Rules <span className="muted" style={{ fontWeight: 500 }}>· {s.rules.length}</span></div>
+                <button className="btn small" onClick={() => setRuleDlg('new')}>+ Add rule</button>
               </div>
-              {rule && (
-                <div style={{ width: 300, flex: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 24, fontWeight: 600 }}>Edit rule</div>
-                  <label htmlFor="rn">Name</label><input id="rn" type="text" value={rule.name} onChange={e => set({ name: e.target.value })} />
-                  <label htmlFor="rc">Category</label><input id="rc" type="text" value={rule.category} onChange={e => set({ category: e.target.value })} />
-                  <label htmlFor="re">Repeat every</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input id="re" type="number" min={1} value={rule.every_n} style={{ width: 90 }} onChange={e => set({ every_n: Math.max(1, Number(e.target.value) || 1) })} />
-                    <select aria-label="Unit" value={rule.unit} onChange={e => set({ unit: e.target.value as Unit })}>{['days', 'weeks', 'months', 'years'].map(u => <option key={u}>{u}</option>)}</select>
-                  </div>
-                  <label htmlFor="rl">Last done</label><input id="rl" type="date" value={rule.last_done ?? ''} onChange={e => set({ last_done: e.target.value || null })} />
-                  <label>Points when done</label>
-                  <div style={{ display: 'flex', gap: 8 }}>{(['baby', 'biggie'] as Size[]).map(sz => <button key={sz} className={'btn small ' + (rule.size === sz ? '' : 'outline')} onClick={() => set({ size: sz })}>{SIZE_LABEL[sz]} +{POINTS[sz]}</button>)}</div>
-                  <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 16 }}><input type="checkbox" checked={rule.keep} style={{ width: 24, height: 24 }} onChange={e => set({ keep: e.target.checked })} /> Keep this rule</label>
-                </div>
-              )}
+              {sorted.map(r => (
+                <button key={r.id} onClick={() => setRuleDlg(r)} className="row" style={{ width: '100%', border: 'none', borderBottom: '1px solid var(--row)', background: 'transparent', textAlign: 'left', padding: '0 8px', borderRadius: 12, minHeight: 56 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 18, fontWeight: 600 }}>{r.name}</div><div className="muted" style={{ fontSize: 13 }}>{r.category} · every {r.every_n} {r.unit}</div></div>
+                  <div style={{ width: 100, fontSize: 15 }}>{nextDue(r) ? fmtShort(nextDue(r)!) : '—'}</div>
+                  <span className="pill" style={{ background: status(r, t) === 'overdue' ? 'var(--accent)' : 'var(--faint)', color: status(r, t) === 'overdue' ? 'var(--on-accent)' : 'var(--muted)', border: '1px solid var(--border)' }}>{label[status(r, t)]}</span>
+                </button>
+              ))}
             </div>
           )}
           {sec === 'habits' && (
@@ -808,7 +830,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
           )}
           {sec === 'errors' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ fontSize: 30, fontWeight: 600, flex: 1 }}>Errors</div>{errList.length > 0 && <button className="btn small outline" onClick={() => { clearErrors(); setErrList([]) }}>Clear</button>}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ fontSize: 30, fontWeight: 600, flex: 1 }}>Logs</div>{errList.length > 0 && <button className="btn small outline" onClick={() => { clearErrors(); setErrList([]) }}>Clear</button>}</div>
               {errList.length === 0 && <div className="muted" style={{ fontSize: 17 }}>No problems recorded. If something does not save or load, it will be listed here with the time.</div>}
               {errList.map((e, i) => (
                 <div key={i} className="card" style={{ padding: '12px 18px' }}>

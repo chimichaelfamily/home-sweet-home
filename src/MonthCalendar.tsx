@@ -8,6 +8,7 @@ const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export function MonthCalendar() {
   const t = today()
   const [month, setMonth] = useState(t.slice(0, 7))
+  const [x0, setX0] = useState<{ x: number; y: number } | null>(null)
   const y = Number(month.slice(0, 4)), m = Number(month.slice(5, 7))
   const first = new Date(y, m - 1, 1)
   const lead = (first.getDay() + 6) % 7 // Monday first
@@ -18,13 +19,13 @@ export function MonthCalendar() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Calendar</div>
-        <button className="btn small outline" aria-label="Previous month" onClick={() => setMonth(addMonthKey(month, -1))}>‹</button>
-        <div style={{ fontSize: 22, fontWeight: 600, minWidth: 170, textAlign: 'center' }}>{monthLabel(month)}</div>
-        <button className="btn small outline" aria-label="Next month" onClick={() => setMonth(addMonthKey(month, 1))}>›</button>
+        <div style={{ fontSize: 22, fontWeight: 600, minWidth: 170 }}>{monthLabel(month)}</div>
         <div style={{ flex: 1 }} />
         {month !== t.slice(0, 7) && <button className="btn small" onClick={() => setMonth(t.slice(0, 7))}>Today</button>}
       </div>
-      <div className="card" style={{ flex: 1, minHeight: 0, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="card" onTouchStart={e => setX0({ x: e.touches[0].clientX, y: e.touches[0].clientY })}
+        onTouchEnd={e => { if (!x0) return; const dx = e.changedTouches[0].clientX - x0.x, dy = e.changedTouches[0].clientY - x0.y; setX0(null); if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) setMonth(addMonthKey(month, dx < 0 ? 1 : -1)) }}
+        style={{ touchAction: 'pan-y', flex: 1, minHeight: 0, padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
           {DOW.map(d => <div key={d} className="muted" style={{ textAlign: 'center', fontSize: 14, fontWeight: 700, letterSpacing: 1 }}>{d.toUpperCase()}</div>)}
         </div>
