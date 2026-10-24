@@ -47,23 +47,24 @@ export function Products() {
       const r = await scanProduct(imgs)
       const type = (TYPES as readonly string[]).includes(r.type ?? '') ? r.type! : 'Other'
       setForm({ ...blank, name: r.name ?? '', type, place: (PLACES as readonly string[]).includes(r.where ?? '') ? r.where! : 'Kitchen', printed: r.printed_expiry ?? '', months: String(r.shelf_months ?? SHELF[type]), note: r.notes ?? undefined })
-    } catch (e) { setErr((e as Error).message + ' You can type it in instead.'); setForm(blank) } finally { setScanning(false); if (file.current) file.current.value = '' }
+    } catch (e) { setErr((e as Error).message + ' You can add it by hand instead.'); setForm(blank) } finally { setScanning(false); if (file.current) file.current.value = '' }
   }
 
   const list = items.filter(x => !x.used_up && (filter === 'All' || x.place === filter)).sort((a, b) => a.use_by.localeCompare(b.use_by))
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 30, fontWeight: 600 }}>Expired products</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{['All', ...PLACES].map(p => <button key={p} onClick={() => setFilter(p)} style={{ height: 40, padding: '0 14px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: '1.5px solid var(--mborder)', background: filter === p ? 'var(--accent)' : 'transparent', color: filter === p ? 'var(--on-accent)' : 'var(--ink)' }}>{p}</button>)}</div>
-        <div style={{ flex: 1, minWidth: 0 }} />
-        <button className="btn small outline" style={{ whiteSpace: 'nowrap' }} onClick={() => setForm(blank)}>Type it in</button>
-        <button className="btn small" style={{ whiteSpace: 'nowrap' }} disabled={scanning} onClick={() => file.current?.click()}>{scanning ? 'Reading…' : 'Scan product'}</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ fontSize: 30, fontWeight: 600, flex: 1 }}>Expired products</div>
+        <button className="btn" style={{ whiteSpace: 'nowrap' }} disabled={scanning} onClick={() => file.current?.click()}>{scanning ? 'Reading…' : 'Scan product'}</button>
+        <button className="btn outline" style={{ whiteSpace: 'nowrap' }} onClick={() => setForm(blank)}>Add product</button>
         <input ref={file} type="file" accept="image/*" capture="environment" multiple hidden onChange={e => onPhoto(e.target.files)} />
+      </div>
+      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999, alignSelf: 'flex-start', flexWrap: 'wrap' }}>
+        {['All', ...PLACES].map(p => <button key={p} onClick={() => setFilter(p)} style={{ height: 38, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: filter === p ? 'var(--accent)' : 'transparent', color: filter === p ? 'var(--on-accent)' : 'var(--ink)' }}>{p}</button>)}
       </div>
       {err && <div style={{ fontSize: 15, color: 'var(--late)' }}>{err}</div>}
       <div className="card scroll" style={{ flex: 1, minHeight: 0, padding: '8px 24px' }}>
-        {list.length === 0 && <div className="muted" style={{ padding: 20, fontSize: 17 }}>Nothing here yet. Tap Scan product and take a photo of the front label, or Type it in.</div>}
+        {list.length === 0 && <div className="muted" style={{ padding: 20, fontSize: 17 }}>Nothing here yet. Tap Scan product and take a photo of the front label, or Add product.</div>}
         {list.map(p => { const st = productStatus(p.use_by, t); return (
           <div key={p.id} onClick={() => setForm({ id: p.id, name: p.name, type: p.type, place: p.place, opened: p.opened, printed: p.printed_expiry ?? '', months: String(p.shelf_months) })} style={{ display: 'flex', alignItems: 'center', gap: 16, minHeight: 66, borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
             <div style={{ flex: 1 }}><div style={{ fontSize: 20, fontWeight: 600 }}>{p.name}</div><div className="muted" style={{ fontSize: 14 }}>{p.type} · {p.place} · opened {fmtShort(p.opened)}</div></div>

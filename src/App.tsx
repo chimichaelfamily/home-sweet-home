@@ -644,10 +644,10 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
   ) : null
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Reminders</div><div className="muted" style={{ fontSize: 17 }}>{over.length} overdue · {coming.length} coming up</div></div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Reminders</div></div>
       <div className="card scroll" style={{ flex: 1, padding: '6px 28px 24px' }}>
-        {section('OVERDUE · MOST LATE FIRST', over, true, 'var(--late)')}
-        {section('COMING UP · NEXT 2 WEEKS', coming, false)}
+        {section(`OVERDUE · ${over.length}`, over, true, 'var(--late)')}
+        {section(`COMING UP · ${coming.length}`, coming, false)}
         {over.length === 0 && coming.length === 0 && <div className="muted" style={{ padding: '18px 0', fontSize: 17 }}>Nothing overdue and nothing due in the next 2 weeks.</div>}
         {all && section('LATER', later, false)}
         {later.length > 0 && <button className="btn small outline" style={{ marginTop: 16 }} onClick={() => setAll(!all)}>{all ? 'Show less' : `See all (${later.length} more)`}</button>}
