@@ -85,3 +85,22 @@ export async function saveCalLink(person: 'linh' | 'michael', url: string, all: 
   if (supabase) { await supabase.from('calendars').upsert({ person_id: person, url }, { onConflict: 'person_id' }); return }
   try { localStorage.setItem(CAL_KEY, JSON.stringify({ ...all, [person]: url })) } catch { /* ignore */ }
 }
+
+export interface MItem { id: string; person_id: 'linh' | 'michael'; kind: 'affirmation' | 'link' | 'song'; title: string; sub: string; url: string; sort: number }
+const M_KEY = 'home-sweet-home.morning.v1'
+export function seedMorning(): MItem[] {
+  const t = ['I am building a life of freedom, and every small step counts.', 'I am calm, capable and ready for today.', 'I make time for the things that matter to me.', 'I am proud of how far I have come.', 'Good things are coming, and I am ready for them.']
+  return (['linh', 'michael'] as const).flatMap(p => t.map((title, i) => ({ id: `${p}-aff-${i + 1}`, person_id: p, kind: 'affirmation' as const, title, sub: '', url: '', sort: i + 1 })))
+}
+export async function loadMorning(): Promise<MItem[]> {
+  if (supabase) { const { data } = await supabase.from('morning_items').select('*').order('sort'); return (data ?? []) as MItem[] }
+  try { const r = localStorage.getItem(M_KEY); return r ? JSON.parse(r) : seedMorning() } catch { return seedMorning() }
+}
+export async function saveMorning(all: MItem[], op: { upsert?: MItem; remove?: string }) {
+  if (supabase) {
+    if (op.upsert) await supabase.from('morning_items').upsert(op.upsert, { onConflict: 'id' })
+    if (op.remove) await supabase.from('morning_items').delete().eq('id', op.remove)
+    return
+  }
+  try { localStorage.setItem(M_KEY, JSON.stringify(all)) } catch { /* ignore */ }
+}

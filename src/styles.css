@@ -47,3 +47,4 @@ input[type=text], input[type=password], input[type=email], input[type=date], inp
 input:focus, select:focus { outline: none; border-color: var(--accent); }
 label { font-size: 14px; font-weight: 600; color: var(--muted); }
 .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+a.btn { display: inline-flex; align-items: center; }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { emptyState, load, loadCalLinks, saveCalLink, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
+import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
 import { addMonthKey, daysInMonth, longestInMonth, monthLabel, streak, weatherText } from './lib/habits.ts'
 import * as A from './lib/actions.ts'
@@ -7,7 +7,7 @@ import { addDays, diffDays, dowShort, fmtLong, fmtShort, isoToYmd, today } from 
 import { daysLate, headsUps, nextDue, status, type Rule, type Unit } from './lib/rules.ts'
 import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Who } from './lib/types.ts'
 
-type Tab = 'home' | 'habits' | 'reminders' | 'points' | 'settings'
+type Tab = 'home' | 'habits' | 'morning' | 'reminders' | 'points' | 'settings'
 type Pending = { kind: 'task' | 'rule'; id: string; title: string; size: Size } | null
 const THEMES = [
   { id: 'lilac', name: 'Lilac haze', note: 'Lavender, dusty pink' },
@@ -68,12 +68,13 @@ export default function App() {
       <div className="main">
         {tab === 'home' && <Home s={state} apply={apply} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
         {tab === 'habits' && <Habits s={state} apply={apply} />}
+        {tab === 'morning' && <Morning />}
         {tab === 'reminders' && <Reminders s={state} apply={apply} onDone={setPending} />}
         {tab === 'points' && <Points s={state} apply={apply} />}
         {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['points', 'Points'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+        {([['home', 'Home'], ['habits', 'Habits'], ['morning', 'Morning'], ['reminders', 'Reminders'], ['points', 'Points'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
@@ -300,7 +301,6 @@ function Schedule() {
   const days = scheduleDays(t)
   const [links, setLinks] = useState<CalLinks | null>(null)
   const [events, setEvents] = useState<CalEvent[]>([])
-  const [show, setShow] = useState({ linh: true, michael: true })
   const [err, setErr] = useState('')
   useEffect(() => {
     let off = false
@@ -309,7 +309,7 @@ function Schedule() {
         const l = await loadCalLinks(); if (off) return
         setLinks(l)
         const all: CalEvent[] = []
-        for (const p of ['linh', 'michael'] as const) if (l[p]) all.push(...await fetchCalendar(l[p], p, days[0], days[days.length - 1]))
+        if (l.linh) all.push(...await fetchCalendar(l.linh, 'linh', days[0], days[days.length - 1]))
         if (!off) { setEvents(all); setErr('') }
       } catch { if (!off) setErr('Could not refresh the calendar. Showing the last update.') }
     }
@@ -317,25 +317,22 @@ function Schedule() {
     return () => { off = true; clearInterval(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t])
-  const connected = links && (links.linh || links.michael)
+  const connected = links && links.linh
   return (
     <div className="card" style={{ flex: 1, padding: '16px 24px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ fontSize: 24, fontWeight: 600 }}>Schedule</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {(['linh', 'michael'] as const).map(p => <button key={p} aria-pressed={show[p]} onClick={() => setShow({ ...show, [p]: !show[p] })} style={{ height: 36, padding: '0 14px', borderRadius: 999, fontWeight: 600, fontSize: 14, border: `1.5px solid ${p === 'linh' ? 'var(--accent)' : 'var(--blue-bd)'}`, background: show[p] ? (p === 'linh' ? 'var(--accent)' : 'var(--blue-bd)') : 'transparent', color: show[p] ? '#fff' : 'var(--ink)' }}>{PEOPLE[p]}</button>)}
-        </div>
       </div>
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
-        {links && !connected && <div className="muted" style={{ fontSize: 16, lineHeight: 1.5 }}>No calendars yet. Open Settings → Calendars and paste each person's private Google Calendar link.</div>}
+        {links && !connected && <div className="muted" style={{ fontSize: 16, lineHeight: 1.5 }}>No calendar yet. Open Settings → Calendars and paste the shared household calendar link.</div>}
         {connected && days.map(d => {
-          const ev = events.filter(e => e.day === d && show[e.person]).sort((a, b) => a.sort - b.sort)
+          const ev = events.filter(e => e.day === d).sort((a, b) => a.sort - b.sort)
           return (
             <div key={d} style={{ display: 'flex', gap: 14, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
               <div style={{ width: 62, flex: 'none', fontWeight: 700, fontSize: 15, color: d === t ? 'var(--accent)' : 'var(--ink)' }}>{d === t ? 'Today' : dowShort(d)}<div className="muted" style={{ fontSize: 12, fontWeight: 500 }}>{fmtShort(d)}</div></div>
               <div style={{ flex: 1 }}>
                 {ev.length === 0 && <div className="muted" style={{ fontSize: 14, padding: '4px 0' }}>Nothing planned</div>}
-                {ev.map((e, i) => <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 16, padding: '3px 0' }}><span style={{ width: 8, height: 8, borderRadius: '50%', flex: 'none', background: e.person === 'linh' ? 'var(--accent)' : 'var(--blue-bd)' }} /><span className="muted" style={{ width: 64, flex: 'none', fontSize: 14 }}>{e.time}</span><span style={{ fontWeight: 600 }}>{e.title}</span></div>)}
+                {ev.map((e, i) => <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 16, padding: '3px 0' }}><span style={{ width: 8, height: 8, borderRadius: '50%', flex: 'none', background: 'var(--accent)' }} /><span className="muted" style={{ width: 64, flex: 'none', fontSize: 14 }}>{e.time}</span><span style={{ fontWeight: 600 }}>{e.title}</span></div>)}
               </div>
             </div>
           )
@@ -359,14 +356,88 @@ function CalendarSettings() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
       <div style={{ fontSize: 30, fontWeight: 600 }}>Calendars</div>
-      <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>Google: on a computer, Google Calendar → Settings → click your calendar on the left → "Integrate calendar" → copy <b>Secret address in iCal format</b>. Paste it here. It is read-only. Outlook: Settings → Calendar → Shared calendars → Publish a calendar → ICS link. Anyone with a link can see that calendar, so keep it private.</div>
-      {(['linh', 'michael'] as const).map(p => (
-        <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <label style={{ fontWeight: 600 }}>{PEOPLE[p]}</label>
-          <input type="text" defaultValue={links[p]} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links[p]) save1(p, e.target.value) }} />
-        </div>
-      ))}
+      <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>One calendar for both of you. In Google Calendar on a computer: Settings → click the shared calendar on the left → "Integrate calendar" → copy <b>Secret address in iCal format</b>. Paste it here. It is read-only. Outlook: Settings → Calendar → Shared calendars → Publish a calendar → ICS link. Anyone with a link can see that calendar, so keep it private.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label style={{ fontWeight: 600 }}>Household calendar link</label>
+        <input type="text" defaultValue={links.linh} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.linh) save1('linh', e.target.value) }} />
+      </div>
       {msg && <div style={{ fontSize: 14 }}>{msg}</div>}
+    </div>
+  )
+}
+
+function Morning() {
+  const [items, setItems] = useState<MItem[]>([])
+  const [who, setWho] = useState<'linh' | 'michael'>('linh')
+  const [i, setI] = useState(0)
+  const [edit, setEdit] = useState(false)
+  useEffect(() => { loadMorning().then(setItems).catch(() => setItems([])) }, [])
+  const mine = (k: MItem['kind']) => items.filter(x => x.person_id === who && x.kind === k).sort((a, b) => a.sort - b.sort)
+  const aff = mine('affirmation'), links = mine('link'), songs = mine('song')
+  const upsert = (it: MItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); saveMorning(next, { upsert: it }) }
+  const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); saveMorning(next, { remove: id }) }
+  const add = (kind: MItem['kind'], title: string, sub = '', url = '') => {
+    const list = mine(kind); upsert({ id: `${who}-${kind}-${Date.now().toString(36)}`, person_id: who, kind, title, sub, url, sort: (list[list.length - 1]?.sort ?? 0) + 1 })
+  }
+  const cur = aff[Math.min(i, Math.max(0, aff.length - 1))]
+  const Row = ({ it, kind }: { it: MItem; kind: 'link' | 'song' }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 58, borderBottom: '1px solid var(--border)' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+        {it.sub && <div className="muted" style={{ fontSize: 14 }}>{it.sub}</div>}
+      </div>
+      {edit ? <button className="btn small outline" onClick={() => remove(it.id)}>Remove</button>
+        : it.url ? <a className="btn small outline" href={it.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>{kind === 'song' ? 'Play' : 'Open'}</a>
+        : <span className="muted" style={{ fontSize: 13 }}>No link</span>}
+    </div>
+  )
+  const AddForm = ({ kind, ph, subPh }: { kind: 'link' | 'song'; ph: string; subPh: string }) => {
+    const [a, setA] = useState(''); const [b, setB] = useState(''); const [u, setU] = useState('')
+    return (
+      <form style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }} onSubmit={e => { e.preventDefault(); if (a.trim()) { add(kind, a.trim(), b.trim(), u.trim()); setA(''); setB(''); setU('') } }}>
+        <div style={{ display: 'flex', gap: 8 }}><input type="text" placeholder={ph} value={a} onChange={e => setA(e.target.value)} /><input type="text" placeholder={subPh} value={b} onChange={e => setB(e.target.value)} /></div>
+        <div style={{ display: 'flex', gap: 8 }}><input type="text" placeholder="Paste the link (https://…)" value={u} onChange={e => setU(e.target.value)} /><button className="btn small" type="submit">Add</button></div>
+      </form>
+    )
+  }
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ fontSize: 36, fontWeight: 600 }}>Morning</div>
+        <div style={{ flex: 1 }} />
+        <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>
+        <PersonToggle who={who} setWho={w => { setWho(w); setI(0) }} />
+      </div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 14 }}>
+        <div style={{ flex: 1.2, minWidth: 0, borderRadius: 28, padding: 28, display: 'flex', flexDirection: 'column', gap: 14, color: 'var(--on-accent)', background: 'linear-gradient(135deg,var(--accent),var(--g2))' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}><span>1 · READ YOUR AFFIRMATIONS</span><span>{aff.length ? `${Math.min(i, aff.length - 1) + 1} of ${aff.length}` : ''}</span></div>
+          {!edit && <>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', fontSize: 36, fontWeight: 600, lineHeight: 1.2 }}>{cur ? cur.title : 'No affirmations yet. Tap Edit to add some.'}</div>
+            <div style={{ display: 'flex', gap: 8 }}>{aff.map((_, k) => <div key={k} style={{ flex: 1, height: 6, borderRadius: 6, background: k <= i ? '#fff' : 'rgba(255,255,255,.35)' }} />)}</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff', opacity: i === 0 ? .5 : 1 }} disabled={i === 0} onClick={() => setI(i - 1)}>Back</button>
+              <button className="btn" style={{ flex: 1, background: '#fff', color: 'var(--ink)' }} onClick={() => setI(i + 1 >= aff.length ? 0 : i + 1)}>{i + 1 >= aff.length ? 'Start again' : 'Next'}</button>
+            </div></>}
+          {edit && <div className="scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {aff.map(a => <div key={a.id} style={{ display: 'flex', gap: 8 }}><input type="text" defaultValue={a.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.title) upsert({ ...a, title: v }) }} /><button className="btn small" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff' }} onClick={() => remove(a.id)}>Remove</button></div>)}
+            <form onSubmit={e => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('new') as HTMLInputElement; if (f.value.trim()) { add('affirmation', f.value.trim()); f.value = '' } }} style={{ display: 'flex', gap: 8 }}><input name="new" type="text" placeholder="New affirmation" /><button className="btn small" type="submit" style={{ background: '#fff', color: 'var(--ink)' }}>Add</button></form>
+          </div>}
+        </div>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="card scroll" style={{ flex: 1, padding: '18px 22px' }}>
+            <div className="muted" style={{ fontSize: 14, fontWeight: 600, letterSpacing: 1.5, marginBottom: 4 }}>2 · MOVE</div>
+            {links.length === 0 && !edit && <div className="muted" style={{ fontSize: 15, padding: '8px 0' }}>No videos yet. Tap Edit and paste a YouTube link.</div>}
+            {links.map(l => <Row key={l.id} it={l} kind="link" />)}
+            {edit && <AddForm kind="link" ph="Name, e.g. Morning stretch" subPh="Note, e.g. YouTube · 20 min" />}
+          </div>
+          <div className="card scroll" style={{ flex: 1, padding: '18px 22px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div className="muted" style={{ fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}>3 · MORNING MUSIC</div><span className="muted" style={{ fontSize: 13 }}>Opens in Spotify</span></div>
+            {songs.length === 0 && !edit && <div className="muted" style={{ fontSize: 15, padding: '8px 0' }}>No songs yet. Tap Edit and paste a Spotify link.</div>}
+            {songs.map(sg => <Row key={sg.id} it={sg} kind="song" />)}
+            {edit && <AddForm kind="song" ph="Song or playlist" subPh="Artist" />}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
