@@ -31,7 +31,8 @@ export async function gemini({ system, contents, json }) {
   if (json) body.generationConfig = { responseMimeType: 'application/json' }
   let last = null
   for (const model of modelList()) {
-    const r = await callGemini(model, body)
+    let r = await callGemini(model, body)
+    if (r.status === 503 || r.status === 500) { await new Promise(ok => setTimeout(ok, 1500)); r = await callGemini(model, body) } // Google is briefly busy: retry once
     if (r.status === 200) {
       const text = (r.json.candidates?.[0]?.content?.parts ?? []).map(p => p.text ?? '').join('').trim()
       if (!text) throw Object.assign(new Error('The AI gave an empty answer (it may have blocked the request). Try rephrasing.'), { status: 502 })
@@ -43,6 +44,7 @@ export async function gemini({ system, contents, json }) {
     if (r.status === 403 || r.status === 401) break
     // 404 (model name not available) or 5xx: try the next model
   }
-  const hint = last.status === 400 || last.status === 403 || last.status === 401 ? ' Check the key in Vercel: it must be a Gemini key from aistudio.google.com.' : ''
+  const busy = last.status === 503 ? ' Google\'s AI is busy right now. Wait a minute and try again.' : ''
+  const hint = busy || last.status === 400 || last.status === 403 || last.status === 401 ? ' Check the key in Vercel: it must be a Gemini key from aistudio.google.com.' : ''
   throw Object.assign(new Error(`Gemini said ${last.status}: ${last.message || 'no details'}.${hint}`), { status: 502 })
 }
