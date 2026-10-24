@@ -75,8 +75,8 @@ export default function App() {
         {tab === 'habits' && <Habits s={state} apply={apply} />}
         {tab === 'morning' && <Morning />}
         {tab === 'private' && <Private />}
-        {tab === 'ask' && <Ask s={state} />}
-        {tab === 'weekly' && <Weekly s={state} />}
+        <div style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
+        <div style={{ height: '100%', display: tab === 'weekly' ? 'block' : 'none' }}><Weekly s={state} /></div>
         {tab === 'products' && <Products />}
         {tab === 'reminders' && <Reminders s={state} apply={apply} onDone={setPending} />}
         {tab === 'points' && <Points s={state} apply={apply} />}

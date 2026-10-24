@@ -12,19 +12,37 @@ export async function requireUser(req, res) {
   return true
 }
 
-export async function gemini({ system, contents, json }) {
+const FALLBACKS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']
+export const modelList = () => [...new Set([process.env.GEMINI_MODEL, ...FALLBACKS].filter(Boolean))]
+
+export async function callGemini(model, body) {
   const key = process.env.GEMINI_API_KEY
-  if (!key) throw Object.assign(new Error('GEMINI_API_KEY is not set in Vercel yet.'), { status: 500 })
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body),
+  })
+  const j = await r.json().catch(() => ({}))
+  return { status: r.status, json: j, message: j?.error?.message || '' }
+}
+
+export async function gemini({ system, contents, json }) {
+  if (!process.env.GEMINI_API_KEY) throw Object.assign(new Error('GEMINI_API_KEY is not set in Vercel yet (or the project was not redeployed after adding it).'), { status: 500 })
   const body = { contents }
   if (system) body.systemInstruction = { parts: [{ text: system }] }
   if (json) body.generationConfig = { responseMimeType: 'application/json' }
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body),
-  })
-  if (r.status === 429) throw Object.assign(new Error('The free AI limit was reached for now. Try again in a little while.'), { status: 429 })
-  if (!r.ok) throw Object.assign(new Error('The AI service returned an error (' + r.status + ').'), { status: 502 })
-  const j = await r.json()
-  const text = (j.candidates?.[0]?.content?.parts ?? []).map(p => p.text ?? '').join('').trim()
-  if (!text) throw Object.assign(new Error('The AI gave an empty answer. Try again.'), { status: 502 })
-  return text
+  let last = null
+  for (const model of modelList()) {
+    const r = await callGemini(model, body)
+    if (r.status === 200) {
+      const text = (r.json.candidates?.[0]?.content?.parts ?? []).map(p => p.text ?? '').join('').trim()
+      if (!text) throw Object.assign(new Error('The AI gave an empty answer (it may have blocked the request). Try rephrasing.'), { status: 502 })
+      return text
+    }
+    last = r
+    if (r.status === 429) throw Object.assign(new Error('The free AI limit was reached for now. Try again in a little while.'), { status: 429 })
+    if (r.status === 400 && /API key/i.test(r.message)) break
+    if (r.status === 403 || r.status === 401) break
+    // 404 (model name not available) or 5xx: try the next model
+  }
+  const hint = last.status === 400 || last.status === 403 || last.status === 401 ? ' Check the key in Vercel: it must be a Gemini key from aistudio.google.com.' : ''
+  throw Object.assign(new Error(`Gemini said ${last.status}: ${last.message || 'no details'}.${hint}`), { status: 502 })
 }
