@@ -77,14 +77,13 @@ export default function App() {
         {tab === 'private' && <Private />}
         <div style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
         <div style={{ height: '100%', display: tab === 'weekly' ? 'block' : 'none' }}><Weekly s={state} /></div>
-        {tab === 'products' && <Products />}
         {tab === 'reminders' && <Reminders s={state} apply={apply} onDone={setPending} />}
         {tab === 'points' && <Points s={state} apply={apply} />}
         {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['habits', 'Habits'], ['morning', 'Morning'], ['private', 'Private'], ['products', 'Products'], ['weekly', 'Weekly'], ['ask', 'Ask'], ['reminders', 'Reminders'], ['points', 'Points'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
-          <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
+        {([['home', 'Home'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Morning'], ['reminders', 'Reminders'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+          <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
         ))}
         <div style={{ flex: 1 }} />
         <span className="muted" style={{ fontSize: 14 }}>{usingDatabase ? (backupDue() ? 'Backup due: Settings → Backup' : 'Saved to database') : 'Demo mode: saved on this iPad only'}</span>
@@ -619,7 +618,7 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
 }
 
 function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'calendars' | 'backup'>('look')
+  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'calendars' | 'products' | 'backup'>('look')
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
   const [sel, setSel] = useState<string | null>(null)
@@ -640,7 +639,7 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['calendars', 'Calendars'], ['backup', 'Backup']] as const).map(([id, l]) => (
+          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['calendars', 'Calendars'], ['products', 'Products'], ['backup', 'Backup']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
@@ -709,6 +708,7 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
             </div>
           )}
           {sec === 'calendars' && <CalendarSettings />}
+          {sec === 'products' && <div style={{ height: '100%', minWidth: 0 }}><Products /></div>}
           {sec === 'backup' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 520 }}>
               <div style={{ fontSize: 30, fontWeight: 600 }}>Backup</div>

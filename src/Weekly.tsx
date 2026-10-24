@@ -58,7 +58,7 @@ ${withGoals ? goalsText() : ''}`
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ fontSize: 36, fontWeight: 600 }}>Weekly</div>
+        <div style={{ fontSize: 36, fontWeight: 600 }}>Report</div>
         <button className="btn small outline" aria-label="Earlier week" onClick={() => setOffset(offset + 1)}>‹</button>
         <div style={{ fontSize: 18, fontWeight: 600 }}>{fmtShort(w.from)} to {fmtShort(w.to)}</div>
         <button className="btn small outline" aria-label="Later week" disabled={offset === 0} onClick={() => setOffset(offset - 1)}>›</button>

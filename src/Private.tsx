@@ -30,7 +30,7 @@ export function Private() {
   return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="card" style={{ width: 520, padding: 36, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ fontSize: 34, fontWeight: 600 }}>Private</div>
+        <div style={{ fontSize: 34, fontWeight: 600 }}>Goals</div>
         <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Goals, vision board and money. Locked with Face ID, and it locks itself after 2 minutes.</div>
         {!lockSupported() && <div style={{ fontSize: 15 }}>This browser does not support Face ID passkeys. Open the app from the Home Screen icon in Safari.</div>}
         {lockSupported() && !registered && <button className="btn" onClick={() => go(true)}>Set up Face ID for this iPad</button>}
@@ -55,7 +55,7 @@ function Inside({ onLock }: { onLock: () => void }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ fontSize: 36, fontWeight: 600 }}>Private</div>
+        <div style={{ fontSize: 36, fontWeight: 600 }}>Goals</div>
         <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
           {([['goals', 'Goals'], ['vision', 'Vision board'], ['money', 'Money magic']] as [Sub, string][]).map(([k, l]) => <button key={k} onClick={() => setSub(k)} style={{ height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: sub === k ? 'var(--accent)' : 'transparent', color: sub === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
         </div>

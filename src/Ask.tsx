@@ -49,7 +49,7 @@ export function Ask({ s }: { s: State }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ fontSize: 36, fontWeight: 600 }}>Ask</div>
+        <div style={{ fontSize: 36, fontWeight: 600 }}>AI chat</div>
         <div style={{ flex: 1 }} />
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 15 }}><input type="checkbox" checked={speak} onChange={e => setSpeak(e.target.checked)} style={{ width: 22, height: 22 }} />Read answers aloud</label>
         {msgs.length > 0 && <button className="btn small outline" onClick={() => { setMsgs([]); window.speechSynthesis?.cancel() }}>New chat</button>}
