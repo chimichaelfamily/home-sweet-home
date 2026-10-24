@@ -261,7 +261,6 @@ function HabitRow({ name, n, done, dayKey, today: t, streakN, onToggle }: { name
 }
 
 const Pencil = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" /></svg>
-const Trash = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>
 
 function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onEdit: (id: string) => void; onEditRule: (id: string) => void; onAdd: () => void; onTick: (p: NonNullable<Pending>) => void; goReminders: () => void }) {
   const t = today()
@@ -273,7 +272,6 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
     const ev = s.events.filter(e => !e.undone_at && (kind === 'task' ? e.task_id === id : e.rule_id === id && isoToYmd(e.created_at) === t)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0]
     if (ev) apply(A.undo(s, ev.batch))
   }
-  const delTask = (id: string, title: string) => { if (confirm(`Delete "${title}"?`)) apply(A.deleteTask(s, id)) }
   const doneRulesToday = [...new Map(s.events.filter(e => e.rule_id && !e.undone_at && isoToYmd(e.created_at) === t).map(e => [e.rule_id!, e])).values()]
   const todayTasks = s.tasks.filter(x => x.due_date <= t && (!x.done_at || isoToYmd(x.done_at) === t))
   const later = s.tasks.filter(x => x.due_date > t && !x.done_at)
@@ -300,7 +298,6 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
               {personTag(x.assignee) && <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>{personTag(x.assignee)}</span>}
               <span className={'pill ' + x.size}>+{POINTS[x.size]}</span>
               <button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button>
-              <button className="more" aria-label={`Delete ${x.title}`} onClick={() => delTask(x.id, x.title)}><Trash /></button>
             </div>
           ))}
           {doneRulesToday.map(e => (
@@ -328,7 +325,7 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
           )}
           {later.length > 0 && <div className="head" style={{ marginTop: 12 }}>LATER</div>}
           {later.map(x => (
-            <div className="row" key={x.id}><div className="circle" /><div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer' }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span><button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button><button className="more" aria-label={`Delete ${x.title}`} onClick={() => delTask(x.id, x.title)}><Trash /></button></div>
+            <div className="row" key={x.id}><div className="circle" /><div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer' }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span><button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button></div>
           ))}
         </div>
         <button onClick={onAdd} style={{ marginTop: 8, height: 56, borderRadius: 16, border: '1.5px dashed var(--mborder)', background: 'transparent', fontSize: 19, fontWeight: 600 }}>+ Add task</button>
