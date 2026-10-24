@@ -273,8 +273,8 @@ function Home({ s, apply, onAdd, onTick, goReminders }: { s: State; apply: (r: {
               {over.slice(0, 3).map(r => (
                 <div className="row" key={r.id} style={{ minHeight: 46 }}>
                   <button className="circle late" style={{ width: 30, height: 30 }} aria-label={`Tick ${r.name}`} onClick={() => onTick({ kind: 'rule', id: r.id, title: r.name, size: r.size })} />
-                  <div style={{ flex: 1, fontSize: 19, fontWeight: 700 }}>{r.name}</div>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--late)' }}>{daysLate(r, t)} days late</span>
+                  <div style={{ flex: 1, fontSize: 19, fontWeight: 500 }}>{r.name}</div>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--late)' }}>{daysLate(r, t)} days late</span>
                   <span className={'pill ' + r.size}>+{POINTS[r.size]}</span>
                 </div>
               ))}
@@ -531,10 +531,10 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
     return (
       <div className="row" style={{ minHeight: 62, position: 'relative' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 20, fontWeight: isOver ? 700 : 400 }}>{r.name}</div>
+          <div style={{ fontSize: 20, fontWeight: 500 }}>{r.name}</div>
           <div className="muted" style={{ fontSize: 14 }}>{r.category} · {isOver ? `was due ${fmtShort(due)}` : `every ${r.every_n} ${r.unit}`}{!isOver && nextHeads ? ` · next heads-up ${fmtShort(nextHeads)}` : ''}{sn ? ` · snoozed until ${fmtShort(sn)}` : ''}</div>
         </div>
-        <div style={{ width: 170, fontSize: 16, fontWeight: 600, color: isOver ? 'var(--late)' : 'var(--muted)' }}>{isOver ? `${daysLate(r, t)} days late` : `${fmtLong(due)}`}</div>
+        <div style={{ width: 170, fontSize: 16, fontWeight: 500, color: isOver ? 'var(--late)' : 'var(--muted)' }}>{isOver ? `${daysLate(r, t)} days late` : `${fmtLong(due)}`}</div>
         <span className={'pill ' + r.size}>{SIZE_LABEL[r.size]} +{POINTS[r.size]}</span>
         {isOver && <button className="btn small outline" onClick={() => setMenu(menu === r.id ? null : r.id)}>Snooze</button>}
         <button className="btn small" onClick={() => onDone({ kind: 'rule', id: r.id, title: r.name, size: r.size })}>Done</button>

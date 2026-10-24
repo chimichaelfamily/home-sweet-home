@@ -15,7 +15,7 @@
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
-body { background: var(--ground); color: var(--ink); font-family: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
+body { background: var(--ground); color: var(--ink); font-family: 'Nunito', ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 .app { height: 100%; padding: 28px 32px 16px; display: flex; flex-direction: column; gap: 16px; }
