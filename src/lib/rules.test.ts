@@ -72,3 +72,11 @@ import { parseIcs, scheduleDays } from './calendar.ts'
   assert.strictEqual(ev.filter(e => e.title === 'Standup').length, 3)
   console.log('calendar tests passed')
 }
+
+import { daysUntil, monthsTo } from './pmath.ts'
+{
+  assert.strictEqual(monthsTo(2027, new Date(2026, 9, 25)), 15) // Oct 2026 .. Dec 2027
+  assert.strictEqual(monthsTo(2026, new Date(2026, 11, 31)), 1)
+  assert.strictEqual(daysUntil('2026-12-25', new Date(2026, 9, 25)), 61)
+  console.log('private tests passed')
+}
