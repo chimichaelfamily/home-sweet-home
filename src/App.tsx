@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, backupAll, lastBackup, markBackup, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
+import { MonthCalendar } from './MonthCalendar.tsx'
 import { Credit, PhotoPicker } from './PhotoPicker.tsx'
 import { Face, FaceSettings, refreshAvatars } from './Face.tsx'
 import { WeatherScene } from './WeatherScene.tsx'
@@ -17,7 +18,7 @@ import { addDays, diffDays, dowShort, fmtLong, fmtShort, isoToYmd, today } from 
 import { daysLate, headsUps, nextDue, status, type Rule, type Unit } from './lib/rules.ts'
 import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Task, type Who } from './lib/types.ts'
 
-type Tab = 'home' | 'habits' | 'morning' | 'private' | 'ask' | 'weekly' | 'products' | 'reminders' | 'points' | 'settings'
+type Tab = 'home' | 'habits' | 'morning' | 'private' | 'calendar' | 'ask' | 'weekly' | 'products' | 'reminders' | 'points' | 'settings'
 type Pending = { kind: 'task' | 'rule'; id: string; title: string; size: Size } | null
 const THEMES = [
   { id: 'lilac', name: 'Lilac haze', note: 'Lavender, dusty pink' },
@@ -81,6 +82,7 @@ export default function App() {
       <div className="main">
         {tab === 'home' && <Home s={state} apply={apply} onEdit={setEditing} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
         {tab === 'habits' && <Habits s={state} apply={apply} />}
+        {tab === 'calendar' && <MonthCalendar />}
         {tab === 'morning' && <Morning />}
         {tab === 'private' && <Private />}
         <div className="keep" style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
@@ -90,7 +92,7 @@ export default function App() {
         {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} mode={mode} setMode={setMode} openErrors={openErrors} clearOpen={() => setOpenErrors(false)} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Morning'], ['reminders', 'Reminders'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+        {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Morning'], ['reminders', 'Reminders'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
         ))}
         {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenErrors(true) }}>Something went wrong: see Settings → Errors</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}

@@ -134,3 +134,14 @@ import { skyOf } from './photos.ts'
   assert.strictEqual(skyOf(73), 'snow'); assert.strictEqual(skyOf(3), 'cloudy'); assert.strictEqual(skyOf(45), 'fog')
   console.log('sky tests passed')
 }
+
+import { solarToLunar } from './lunar.ts'
+{
+  const l = (d: number, m: number, y: number) => { const r = solarToLunar(d, m, y); return `${r.day}/${r.month}${r.leap ? 'L' : ''}` }
+  assert.strictEqual(l(17, 2, 2026), '1/1')   // Tết 2026
+  assert.strictEqual(l(29, 1, 2025), '1/1')   // Tết 2025
+  assert.strictEqual(l(10, 2, 2024), '1/1')   // Tết 2024
+  assert.strictEqual(l(25, 9, 2026), '15/8')  // Mid-Autumn 2026
+  assert.strictEqual(l(16, 2, 2026), '29/12') // last day of the month before Tết 2026
+  console.log('lunar tests passed')
+}
