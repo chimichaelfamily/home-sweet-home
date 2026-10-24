@@ -29,7 +29,6 @@ export default function App() {
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('hsh.theme') || 'lilac' } catch { return 'lilac' } })
   const [adding, setAdding] = useState(false)
   const [pending, setPending] = useState<Pending>(null)
-  const [toast, setToast] = useState<{ batch: string; title: string; who: Who; points: number; key: number } | null>(null)
   const stateRef = useRef<State | null>(null)
   stateRef.current = state
   const [mode, setMode] = useState<'light' | 'dark' | 'auto'>(() => { try { return (localStorage.getItem('hsh.mode') as 'light' | 'dark' | 'auto') || 'light' } catch { return 'light' } })
@@ -65,11 +64,8 @@ export default function App() {
   const doComplete = async (p: NonNullable<Pending>, who: Who) => {
     setPending(null)
     if (!stateRef.current) return
-    const r = await apply(A.complete(stateRef.current, p.kind, p.id, who))
-    if (r.batch) setToast({ batch: r.batch, title: p.title, who, points: POINTS[p.size], key: Date.now() })
+    await apply(A.complete(stateRef.current, p.kind, p.id, who))
   }
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t) }, [toast])
-  const doUndo = async (batch: string) => { setToast(null); if (stateRef.current) await apply(A.undo(stateRef.current, batch)) }
 
   if (usingDatabase && !session) return <Login />
   if (!state) return <div className="app"><div className="muted" style={{ fontSize: 24 }}>{error ?? 'Loading…'}</div></div>
@@ -96,18 +92,6 @@ export default function App() {
       </nav>
       {adding && <AddTask onClose={() => setAdding(false)} onAdd={async (t, sz) => { setAdding(false); if (stateRef.current) await apply(A.addTask(stateRef.current, t, sz)) }} />}
       {pending && <WhoDid p={pending} onPick={w => doComplete(pending, w)} onClose={() => setPending(null)} />}
-      {toast && (
-        <div className="toast" key={toast.key} role="status">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 20, fontWeight: 600 }}>Ticked for {toast.who === 'both' ? 'both of you' : PEOPLE[toast.who]}</div>
-              <div style={{ fontSize: 15, opacity: .8 }}>{toast.title} · +{toast.points}{toast.who === 'both' ? ' each' : ''} points</div>
-            </div>
-            <button className="btn small" style={{ background: '#fff', color: '#2A2540' }} onClick={() => doUndo(toast.batch)}>Undo</button>
-          </div>
-          <div className="bar"><i /></div>
-        </div>
-      )}
     </div>
   )
 }
@@ -545,8 +529,9 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
   const kept = s.rules.filter(r => r.keep && r.last_done)
   const over = kept.filter(r => status(r, t) === 'overdue').sort((a, b) => daysLate(b, t) - daysLate(a, t))
   const rest = kept.filter(r => status(r, t) !== 'overdue').sort((a, b) => (nextDue(a)! < nextDue(b)! ? -1 : 1))
-  const coming = rest.filter(r => diffDays(nextDue(r)!, t) <= 60)
-  const later = rest.filter(r => diffDays(nextDue(r)!, t) > 60)
+  const [all, setAll] = useState(false)
+  const coming = rest.filter(r => diffDays(nextDue(r)!, t) <= 14)
+  const later = rest.filter(r => diffDays(nextDue(r)!, t) > 14)
   const Row = ({ r, isOver }: { r: Rule; isOver: boolean }) => {
     const due = nextDue(r)!; const sn = snoozedUntil(r.id); const h = headsUps(r)
     const nextHeads = [h.monthBefore, h.weeksBefore].filter((x): x is string => !!x && x >= t)[0]
@@ -578,8 +563,10 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Reminders</div><div className="muted" style={{ fontSize: 17 }}>{over.length} overdue · {coming.length} coming up · shared by both of you</div></div>
       <div className="card scroll" style={{ flex: 1, padding: '6px 28px 24px' }}>
         <Section label="OVERDUE · MOST LATE FIRST" list={over} isOver color="var(--late)" />
-        <Section label="COMING UP" list={coming} isOver={false} />
-        <Section label="LATER" list={later} isOver={false} />
+        <Section label="COMING UP · NEXT 2 WEEKS" list={coming} isOver={false} />
+        {over.length === 0 && coming.length === 0 && <div className="muted" style={{ padding: '18px 0', fontSize: 17 }}>Nothing overdue and nothing due in the next 2 weeks.</div>}
+        {all && <Section label="LATER" list={later} isOver={false} />}
+        {later.length > 0 && <button className="btn small outline" style={{ marginTop: 16 }} onClick={() => setAll(!all)}>{all ? 'Show less' : `See all (${later.length} more)`}</button>}
       </div>
     </div>
   )
