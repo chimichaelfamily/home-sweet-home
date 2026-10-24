@@ -102,3 +102,13 @@ import { productStatus, useBy } from './products.ts'
   assert.strictEqual(productStatus('2026-11-10', '2026-10-25').label, 'In 16 days')
   console.log('product tests passed')
 }
+
+import { embedUrl } from './embed.ts'
+{
+  assert.ok(embedUrl('https://www.youtube.com/watch?v=abc123')!.src.includes('/embed/abc123'))
+  assert.ok(embedUrl('https://youtu.be/xyz?si=1')!.src.includes('/embed/xyz'))
+  assert.ok(embedUrl('https://www.youtube.com/playlist?list=PL1')!.src.includes('videoseries?list=PL1'))
+  assert.strictEqual(embedUrl('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x')!.src, 'https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC')
+  assert.strictEqual(embedUrl('https://example.com/x'), null)
+  console.log('embed tests passed')
+}

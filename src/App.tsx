@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, backupAll, lastBackup, markBackup, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
+import { embedUrl } from './lib/embed.ts'
 import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
 import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
@@ -395,6 +396,7 @@ function Morning() {
   const [who, setWho] = useState<'linh' | 'michael'>('linh')
   const [i, setI] = useState(0)
   const [edit, setEdit] = useState(false)
+  const [playing, setPlaying] = useState<string | null>(null)
   useEffect(() => { loadMorning().then(setItems).catch(() => setItems([])) }, [])
   const mine = (k: MItem['kind']) => items.filter(x => x.person_id === who && x.kind === k).sort((a, b) => a.sort - b.sort)
   const aff = mine('affirmation'), links = mine('link'), songs = mine('song')
@@ -404,17 +406,27 @@ function Morning() {
     const list = mine(kind); upsert({ id: `${who}-${kind}-${Date.now().toString(36)}`, person_id: who, kind, title, sub, url, sort: (list[list.length - 1]?.sort ?? 0) + 1 })
   }
   const cur = aff[Math.min(i, Math.max(0, aff.length - 1))]
-  const Row = ({ it, kind }: { it: MItem; kind: 'link' | 'song' }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 58, borderBottom: '1px solid var(--border)' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 18, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
-        {it.sub && <div className="muted" style={{ fontSize: 14 }}>{it.sub}</div>}
+  const Row = ({ it, kind }: { it: MItem; kind: 'link' | 'song' }) => {
+    const em = it.url ? embedUrl(it.url) : null
+    const on = playing === it.id
+    return (
+      <div style={{ borderBottom: '1px solid var(--border)', padding: '4px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 54 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+            {it.sub && <div className="muted" style={{ fontSize: 14 }}>{it.sub}</div>}
+          </div>
+          {edit ? <button className="btn small outline" onClick={() => remove(it.id)}>Remove</button>
+            : em ? <button className="btn small outline" onClick={() => setPlaying(on ? null : it.id)}>{on ? 'Close' : kind === 'song' ? 'Play' : 'Watch'}</button>
+            : it.url ? <a className="btn small outline" href={it.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Open</a>
+            : <span className="muted" style={{ fontSize: 13 }}>No link</span>}
+        </div>
+        {on && em && (em.kind === 'youtube'
+          ? <div style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 16, overflow: 'hidden', margin: '4px 0 8px' }}><iframe title={it.title} src={em.src} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} /></div>
+          : <iframe title={it.title} src={em.src} allow="autoplay; encrypted-media; clipboard-write" style={{ width: '100%', height: 152, border: 0, borderRadius: 16, margin: '4px 0 8px' }} />)}
       </div>
-      {edit ? <button className="btn small outline" onClick={() => remove(it.id)}>Remove</button>
-        : it.url ? <a className="btn small outline" href={it.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>{kind === 'song' ? 'Play' : 'Open'}</a>
-        : <span className="muted" style={{ fontSize: 13 }}>No link</span>}
-    </div>
-  )
+    )
+  }
   const AddForm = ({ kind, ph, subPh }: { kind: 'link' | 'song'; ph: string; subPh: string }) => {
     const [a, setA] = useState(''); const [b, setB] = useState(''); const [u, setU] = useState('')
     return (
@@ -455,7 +467,7 @@ function Morning() {
             {edit && <AddForm kind="link" ph="Name, e.g. Morning stretch" subPh="Note, e.g. YouTube · 20 min" />}
           </div>
           <div className="card scroll" style={{ flex: 1, padding: '18px 22px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div className="muted" style={{ fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}>3 · MORNING MUSIC</div><span className="muted" style={{ fontSize: 13 }}>Opens in Spotify</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div className="muted" style={{ fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}>3 · MORNING MUSIC</div><span className="muted" style={{ fontSize: 13 }}>Plays here</span></div>
             {songs.length === 0 && !edit && <div className="muted" style={{ fontSize: 15, padding: '8px 0' }}>No songs yet. Tap Edit and paste a Spotify link.</div>}
             {songs.map(sg => <Row key={sg.id} it={sg} kind="song" />)}
             {edit && <AddForm kind="song" ph="Song or playlist" subPh="Artist" />}
