@@ -28,6 +28,7 @@ console.log('rules tests passed')
 // ---- actions ----
 import { addTask, complete, undo, monthPoints } from './actions.ts'
 import type { State } from './types.ts'
+import * as A from './actions.ts'
 const base: State = { rules: [mk('2025-09-01', 6, 'months')], tasks: [], events: [], snoozes: [], habits: [], habitLogs: [] }
 let r = addTask(base, 'Clean the oven', 'biggie')
 assert.equal(r.state.tasks.length, 1)
@@ -111,4 +112,18 @@ import { embedUrl } from './embed.ts'
   assert.strictEqual(embedUrl('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=x')!.src, 'https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC')
   assert.strictEqual(embedUrl('https://example.com/x'), null)
   console.log('embed tests passed')
+}
+
+{
+  const a = A.addTask(({ rules: [], tasks: [], events: [], snoozes: [], habits: [], habitLogs: [] } as State), 'Vacuum', 'baby')
+  const id = a.state.tasks[0].id
+  const c = A.complete(a.state, 'task', id, 'both')
+  assert.strictEqual(c.state.events.length, 2)
+  const e = A.editTask(c.state, id, { title: 'Vacuum lounge', size: 'biggie' })
+  assert.strictEqual(e.state.tasks[0].title, 'Vacuum lounge')
+  assert.ok(e.state.events.every(x => x.points === 3 && x.title === 'Vacuum lounge'))
+  const d = A.deleteTask(e.state, id)
+  assert.strictEqual(d.state.tasks.length, 0)
+  assert.ok(d.state.events.every(x => !!x.undone_at))
+  console.log('task edit tests passed')
 }

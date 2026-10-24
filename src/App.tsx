@@ -11,7 +11,7 @@ import { addMonthKey, daysInMonth, longestInMonth, monthLabel, streak, weatherTe
 import * as A from './lib/actions.ts'
 import { addDays, diffDays, dowShort, fmtLong, fmtShort, isoToYmd, today } from './lib/dates.ts'
 import { daysLate, headsUps, nextDue, status, type Rule, type Unit } from './lib/rules.ts'
-import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Who } from './lib/types.ts'
+import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Task, type Who } from './lib/types.ts'
 
 type Tab = 'home' | 'habits' | 'morning' | 'private' | 'ask' | 'weekly' | 'products' | 'reminders' | 'points' | 'settings'
 type Pending = { kind: 'task' | 'rule'; id: string; title: string; size: Size } | null
@@ -28,6 +28,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home')
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('hsh.theme') || 'lilac' } catch { return 'lilac' } })
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
   const [pending, setPending] = useState<Pending>(null)
   const stateRef = useRef<State | null>(null)
   stateRef.current = state
@@ -74,7 +75,7 @@ export default function App() {
     <div className="app">
       {error && <div className="card" style={{ padding: '10px 18px', color: 'var(--late)', fontWeight: 600 }}>{error} <button className="btn small outline" onClick={() => setError(null)}>Dismiss</button></div>}
       <div className="main">
-        {tab === 'home' && <Home s={state} apply={apply} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
+        {tab === 'home' && <Home s={state} apply={apply} onEdit={setEditing} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
         {tab === 'habits' && <Habits s={state} apply={apply} />}
         {tab === 'morning' && <Morning />}
         {tab === 'private' && <Private />}
@@ -91,6 +92,15 @@ export default function App() {
         {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenErrors(true) }}>Something went wrong: see Settings → Errors</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
       </nav>
       {adding && <AddTask onClose={() => setAdding(false)} onAdd={async (t, sz) => { setAdding(false); if (stateRef.current) await apply(A.addTask(stateRef.current, t, sz)) }} />}
+      {editing && (() => {
+        const tk = state.tasks.find(x => x.id === editing)
+        if (!tk) return null
+        const live = state.events.filter(e => e.task_id === tk.id && !e.undone_at)
+        return <EditTask key={tk.id} t={tk} done={live.length > 0} onClose={() => setEditing(null)}
+          onSave={(title, size) => { setEditing(null); apply(A.editTask(state, tk.id, { title, size })) }}
+          onDelete={() => { setEditing(null); apply(A.deleteTask(state, tk.id)) }}
+          onUndo={() => { setEditing(null); apply(A.undo(state, live[0].batch)) }} />
+      })()}
       {pending && <WhoDid p={pending} onPick={w => doComplete(pending, w)} onClose={() => setPending(null)} />}
     </div>
   )
@@ -235,7 +245,7 @@ function HabitRow({ name, n, done, dayKey, today: t, streakN, onToggle }: { name
   )
 }
 
-function Home({ s, apply, onAdd, onTick, goReminders }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onAdd: () => void; onTick: (p: NonNullable<Pending>) => void; goReminders: () => void }) {
+function Home({ s, apply, onEdit, onAdd, onTick, goReminders }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onEdit: (id: string) => void; onAdd: () => void; onTick: (p: NonNullable<Pending>) => void; goReminders: () => void }) {
   const t = today()
   const now = new Date()
   const totals = monthTotals(s)
@@ -265,7 +275,7 @@ function Home({ s, apply, onAdd, onTick, goReminders }: { s: State; apply: (r: {
           {todayTasks.map(x => (
             <div className="row" key={x.id}>
               <button className={'circle' + (x.done_at ? ' done' : '')} aria-label={x.done_at ? 'Done' : `Tick ${x.title}`} disabled={!!x.done_at} onClick={() => onTick({ kind: 'task', id: x.id, title: x.title, size: x.size })}>{x.done_at && <Check />}</button>
-              <div style={{ flex: 1, fontSize: 20, ...(x.done_at ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{x.title}</div>
+              <div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', ...(x.done_at ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{x.title}</div>
               {personTag(x.assignee) && <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>{personTag(x.assignee)}</span>}
               <span className={'pill ' + x.size}>+{POINTS[x.size]}</span>
             </div>
@@ -288,7 +298,7 @@ function Home({ s, apply, onAdd, onTick, goReminders }: { s: State; apply: (r: {
           )}
           {later.length > 0 && <div className="head" style={{ marginTop: 12 }}>LATER</div>}
           {later.map(x => (
-            <div className="row" key={x.id}><div className="circle" /><div style={{ flex: 1, fontSize: 20 }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span></div>
+            <div className="row" key={x.id}><div className="circle" /><div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer' }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span></div>
           ))}
         </div>
         <button onClick={onAdd} style={{ marginTop: 8, height: 56, borderRadius: 16, border: '1.5px dashed var(--mborder)', background: 'transparent', fontSize: 19, fontWeight: 600 }}>+ Add task</button>
@@ -501,6 +511,28 @@ function AddTask({ onClose, onAdd }: { onClose: () => void; onAdd: (t: string, s
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}><button type="button" className="btn ghost" onClick={onClose}>Cancel</button><button className="btn" type="submit" disabled={!title.trim()} style={{ opacity: title.trim() ? 1 : .5 }}>Add task</button></div>
     </form></div>
+  )
+}
+
+function EditTask({ t, done, onSave, onDelete, onUndo, onClose }: { t: Task; done: boolean; onSave: (title: string, size: Size) => void; onDelete: () => void; onUndo: () => void; onClose: () => void }) {
+  const [title, setTitle] = useState(t.title)
+  const [size, setSize] = useState<Size>(t.size)
+  return (
+    <div className="overlay" onClick={onClose}><div className="dialog" style={{ width: 480 }} onClick={e => e.stopPropagation()}>
+      <div style={{ fontSize: 30, fontWeight: 600 }}>Edit task</div>
+      <input type="text" aria-label="Task name" value={title} onChange={e => setTitle(e.target.value)} />
+      <div style={{ display: 'flex', gap: 10 }}>
+        {(['baby', 'biggie'] as Size[]).map(z => <button key={z} onClick={() => setSize(z)} style={{ flex: 1, height: 56, borderRadius: 18, fontSize: 18, fontWeight: 600, border: '2px solid ' + (size === z ? 'var(--accent)' : 'var(--border)'), background: size === z ? 'var(--accent)' : 'var(--card)', color: size === z ? 'var(--on-accent)' : 'var(--ink)' }}>{SIZE_LABEL[z]} · +{POINTS[z]}</button>)}
+      </div>
+      {done && <div className="muted" style={{ fontSize: 15 }}>This task is done. Changing its size also changes the points already given.</div>}
+      {done && <button className="btn outline" onClick={onUndo}>Mark as not done (take points back)</button>}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button className="btn outline" onClick={() => { if (confirm('Delete this task' + (done ? ' and its points' : '') + '?')) onDelete() }}>Delete</button>
+        <div style={{ flex: 1 }} />
+        <button className="btn ghost" onClick={onClose}>Cancel</button>
+        <button className="btn" disabled={!title.trim()} onClick={() => onSave(title, size)}>Save</button>
+      </div>
+    </div></div>
   )
 }
 

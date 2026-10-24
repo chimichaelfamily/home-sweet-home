@@ -96,3 +96,29 @@ export function addHabit(s: State, person: 'linh' | 'michael', name: string): Re
 export function updateHabit(s: State, id: string, patch: { name?: string; active?: boolean }): Result {
   return { state: { ...s, habits: s.habits.map(h => (h.id === id ? { ...h, ...patch } : h)) }, ops: [{ table: 'habits', type: 'update', id, patch }] }
 }
+
+/** Rename a task and/or change its size. If it is already done, the points on the board follow. */
+export function editTask(s: State, id: string, patch: { title?: string; size?: Size }): Result {
+  const t = s.tasks.find(x => x.id === id)
+  if (!t) return { state: s, ops: [] }
+  const p: { title?: string; size?: Size } = {}
+  if (patch.title !== undefined && patch.title.trim()) p.title = patch.title.trim()
+  if (patch.size) p.size = patch.size
+  const ops: Op[] = [{ table: 'tasks', type: 'update', id, patch: p }]
+  const events = s.events.map(e => {
+    if (e.task_id !== id || e.undone_at) return e
+    const next = { ...e, ...(p.title ? { title: p.title } : {}), ...(p.size ? { size: p.size, points: POINTS[p.size] } : {}) }
+    ops.push({ table: 'point_events', type: 'update', id: e.id, patch: { ...(p.title ? { title: p.title } : {}), ...(p.size ? { size: p.size, points: POINTS[p.size] } : {}) } })
+    return next
+  })
+  return { state: { ...s, tasks: s.tasks.map(x => (x.id === id ? { ...x, ...p } : x)), events }, ops }
+}
+
+/** Remove a task. Any points it earned are taken off the board too. */
+export function deleteTask(s: State, id: string): Result {
+  const now = new Date().toISOString()
+  const live = s.events.filter(e => e.task_id === id && !e.undone_at)
+  const ops: Op[] = live.map(e => ({ table: 'point_events', type: 'update' as const, id: e.id, patch: { undone_at: now } }))
+  ops.push({ table: 'tasks', type: 'delete', match: { id } })
+  return { state: { ...s, tasks: s.tasks.filter(t => t.id !== id), events: s.events.map(e => (e.task_id === id && !e.undone_at ? { ...e, undone_at: now } : e)) }, ops }
+}
