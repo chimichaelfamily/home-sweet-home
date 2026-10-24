@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
+import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, backupAll, lastBackup, markBackup, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
 import { Weekly } from './Weekly.tsx'
@@ -86,7 +86,7 @@ export default function App() {
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
-        <span className="muted" style={{ fontSize: 14 }}>{usingDatabase ? 'Saved to database' : 'Demo mode: saved on this iPad only'}</span>
+        <span className="muted" style={{ fontSize: 14 }}>{usingDatabase ? (backupDue() ? 'Backup due: Settings → Backup' : 'Saved to database') : 'Demo mode: saved on this iPad only'}</span>
       </nav>
       {adding && <AddTask onClose={() => setAdding(false)} onAdd={async (t, sz) => { setAdding(false); if (stateRef.current) await apply(A.addTask(stateRef.current, t, sz)) }} />}
       {pending && <WhoDid p={pending} onPick={w => doComplete(pending, w)} onClose={() => setPending(null)} />}
@@ -165,6 +165,11 @@ function PersonToggle({ who, setWho }: { who: 'linh' | 'michael'; setWho: (w: 'l
       {(['linh', 'michael'] as const).map(p => <button key={p} onClick={() => setWho(p)} style={{ height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: who === p ? 'var(--accent)' : 'transparent', color: who === p ? 'var(--on-accent)' : 'var(--ink)' }}>{PEOPLE[p]}</button>)}
     </div>
   )
+}
+
+function backupDue(): boolean {
+  const b = lastBackup(); if (!b) return false
+  return diffDays(today(), b) > 35
 }
 
 function Habits({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown> }) {
@@ -611,9 +616,12 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
   const set = (patch: Partial<Rule>) => rule && apply(A.updateRule(s, rule.id, patch))
   const sorted = useMemo(() => [...s.rules].sort((a, b) => (nextDue(a) ?? 'z') < (nextDue(b) ?? 'z') ? -1 : 1), [s.rules])
   const label: Record<string, string> = { overdue: 'Overdue', today: 'Due today', soon: 'Within 30 days', ok: 'OK', skipped: 'Skipped', notstarted: 'Not started' }
-  const download = () => {
-    const blob = new Blob([JSON.stringify(s, null, 2)], { type: 'application/json' })
+  const [bk, setBk] = useState(lastBackup())
+  const download = async () => {
+    const all = await backupAll(s)
+    const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'application/json' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `home-backup-${t}.json`; a.click()
+    markBackup(t); setBk(t)
   }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -692,8 +700,9 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
           {sec === 'backup' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 520 }}>
               <div style={{ fontSize: 30, fontWeight: 600 }}>Backup</div>
-              <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Downloads everything (tasks, points, rules) as one file you can keep. Do this about once a week.</div>
+              <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Downloads everything (tasks, points, rules, habits, morning, private goals and money, products, weekly notes) as one file. Save it somewhere safe, like iCloud Drive. Do this about once a month.</div>
               <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={download}>Download backup</button>
+              <div className="muted" style={{ fontSize: 15 }}>{bk ? `Last backup: ${bk}` : 'No backup yet.'} The backup file contains your private goals and money, so keep it private.</div>
               {!usingDatabase && <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset demo data on this iPad?')) { try { localStorage.removeItem('home-sweet-home.v1') } catch { /* ignore */ } apply({ state: emptyState(), ops: [] }) } }}>Reset demo data</button>}
             </div>
           )}
