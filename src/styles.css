@@ -1,0 +1,49 @@
+:root, [data-theme='lilac'] {
+  --ground:#EFEAF6; --card:#FBFAFE; --border:#DDD3EC; --row:#E7DFF2; --faint:#F5F1FA;
+  --muted:#625A7A; --mborder:#A298BD; --ink:#2A2540; --accent:#B2557A; --on-accent:#FFFFFF; --on-accent-muted:#F6DCE8;
+  --late:#9B3A60; --blue-bg:#DDE3FA; --blue-bd:#5870C9; --blue-tx:#26357D; --g2:#5870C9;
+}
+[data-theme='warm'] {
+  --ground:#F6EDE4; --card:#FFFCF8; --border:#E8D5C6; --row:#F0E2D6; --faint:#F8EFE6;
+  --muted:#7A5F66; --mborder:#B79A9E; --ink:#3B2A30; --accent:#5B3445; --on-accent:#FFFFFF; --on-accent-muted:#EBCFD8;
+  --late:#5B3445; --blue-bg:#DCEBFA; --blue-bd:#2F6DB5; --blue-tx:#1B3F70; --g2:#8A5A6B;
+}
+[data-theme='minimal'] {
+  --ground:#EEF0EC; --card:#FFFFFF; --border:#D7DDD6; --row:#E6EAE4; --faint:#F4F6F2;
+  --muted:#5A6660; --mborder:#8E9A92; --ink:#1E2723; --accent:#3F5B4D; --on-accent:#FFFFFF; --on-accent-muted:#D7DDD6;
+  --late:#3F5B4D; --blue-bg:#DCEBFA; --blue-bd:#2F6DB5; --blue-tx:#1B3F70; --g2:#6D8A7B;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--ground); color: var(--ink); font-family: ui-rounded, 'SF Pro Rounded', -apple-system, system-ui, sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.app { height: 100%; padding: 28px 32px 16px; display: flex; flex-direction: column; gap: 16px; }
+.main { flex: 1; min-height: 0; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 28px; }
+.pill { font-size: 14px; font-weight: 600; border-radius: 999px; padding: 4px 10px; }
+.pill.baby { background: var(--card); border: 1.5px solid var(--mborder); }
+.pill.biggie { background: var(--accent); color: var(--on-accent); }
+.muted { color: var(--muted); }
+.btn { height: 56px; padding: 0 28px; border-radius: 999px; font-size: 18px; font-weight: 600; border: none; background: var(--accent); color: var(--on-accent); }
+.btn.ghost { background: transparent; border: 1.5px solid var(--ink); color: var(--ink); }
+.btn.small { height: 44px; padding: 0 18px; font-size: 15px; }
+.btn.outline { background: var(--card); border: 1.5px solid var(--mborder); color: var(--ink); }
+.nav { display: flex; gap: 12px; height: 68px; flex: none; align-items: center; }
+.nav button { height: 56px; padding: 0 26px; border-radius: 999px; font-size: 18px; font-weight: 600; border: 1px solid var(--border); background: var(--card); }
+.nav button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.row { display: flex; align-items: center; gap: 14px; min-height: 52px; border-bottom: 1px solid var(--row); }
+.circle { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--mborder); background: transparent; flex: none; padding: 0; display: flex; align-items: center; justify-content: center; }
+.circle.late { border-color: var(--accent); border-width: 2.5px; }
+.circle.done { background: var(--accent); border-color: var(--accent); }
+.head { font-size: 14px; font-weight: 600; letter-spacing: 1.5px; color: var(--muted); }
+.overlay { position: fixed; inset: 0; background: rgba(31,26,40,0.55); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.dialog { background: var(--card); border-radius: 28px; padding: 28px; box-shadow: 0 24px 64px rgba(0,0,0,.4); display: flex; flex-direction: column; gap: 16px; }
+.toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); width: 520px; background: var(--ink); color: var(--card); border-radius: 24px; padding: 16px 16px 14px 24px; z-index: 20; display: flex; flex-direction: column; gap: 12px; }
+.toast .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.25); overflow: hidden; }
+.toast .bar i { display: block; height: 4px; background: #fff; animation: shrink 6s linear forwards; }
+@keyframes shrink { from { width: 100%; } to { width: 0; } }
+input[type=text], input[type=password], input[type=email], input[type=date], input[type=number], select { height: 56px; border-radius: 16px; border: 2px solid var(--border); padding: 0 18px; font-size: 20px; background: #fff; width: 100%; user-select: text; }
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+label { font-size: 14px; font-weight: 600; color: var(--muted); }
+.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
