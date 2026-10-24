@@ -12,7 +12,7 @@ export async function requireUser(req, res) {
   return true
 }
 
-const FALLBACKS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']
+const FALLBACKS = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash']
 export const modelList = () => [...new Set([process.env.GEMINI_MODEL, ...FALLBACKS].filter(Boolean))]
 
 export async function callGemini(model, body) {
