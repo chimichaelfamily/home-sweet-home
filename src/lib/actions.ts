@@ -30,7 +30,7 @@ export function complete(s: State, kind: 'task' | 'rule', id: string, who: Who):
     ;({ name: title, category, size } = rule)
     state = { ...s, rules: s.rules.map(r => (r.id === id ? { ...r, last_done: today() } : r)), snoozes: s.snoozes.filter(z => z.rule_id !== id) }
     ops.push({ table: 'rules', type: 'update', id, patch: { last_done: today() } })
-    ops.push({ table: 'snoozes', type: 'delete', id, key: 'rule_id' })
+    ops.push({ table: 'snoozes', type: 'delete', match: { rule_id: id } })
   }
   const people: ('linh' | 'michael')[] = who === 'both' ? ['linh', 'michael'] : [who]
   const events: PEvent[] = people.map(p => ({
@@ -81,4 +81,18 @@ export const monthPoints = (s: State, month: string) => {
   const tot = { linh: 0, michael: 0 }
   for (const e of s.events) if (!e.undone_at && isoToYmd(e.created_at).slice(0, 7) === month) tot[e.person_id] += e.points
   return tot
+}
+
+export function toggleHabit(s: State, habitId: string, day: string): Result {
+  const has = s.habitLogs.some(l => l.habit_id === habitId && l.day === day)
+  if (has) return { state: { ...s, habitLogs: s.habitLogs.filter(l => !(l.habit_id === habitId && l.day === day)) }, ops: [{ table: 'habit_logs', type: 'delete', match: { habit_id: habitId, day } }] }
+  return { state: { ...s, habitLogs: [...s.habitLogs, { habit_id: habitId, day }] }, ops: [{ table: 'habit_logs', type: 'insert', row: { habit_id: habitId, day } }] }
+}
+export function addHabit(s: State, person: 'linh' | 'michael', name: string): Result {
+  const sort = Math.max(0, ...s.habits.filter(h => h.person_id === person).map(h => h.sort)) + 1
+  const h = { id: uid(), person_id: person, name: name.trim(), sort, active: true }
+  return { state: { ...s, habits: [...s.habits, h] }, ops: [{ table: 'habits', type: 'insert', row: { ...h } }] }
+}
+export function updateHabit(s: State, id: string, patch: { name?: string; active?: boolean }): Result {
+  return { state: { ...s, habits: s.habits.map(h => (h.id === id ? { ...h, ...patch } : h)) }, ops: [{ table: 'habits', type: 'update', id, patch }] }
 }

@@ -26,26 +26,31 @@ export const seedRules = (): Rule[] => [
   R('Car service', 'Car', 'Service', 6, 'months', '2026-01-01'),
   R('Back up phones and photos', 'Admin', 'Service', 3, 'months', '2026-01-01'),
 ]
-const empty = (): State => ({ rules: seedRules(), tasks: [], events: [], snoozes: [] })
+export const seedHabits = (): State['habits'] => (['linh', 'michael'] as const).flatMap(p =>
+  ['AM skincare', 'Drink water', 'Vitamins', 'Stretch 10 min', 'PM skincare', 'Read before bed'].map((name, i) => ({ id: crypto.randomUUID(), person_id: p, name, sort: i + 1, active: true })))
+export const emptyState = (): State => ({ rules: seedRules(), tasks: [], events: [], snoozes: [], habits: seedHabits(), habitLogs: [] })
+const empty = emptyState
 
 const LS = 'home-sweet-home.v1'
 export async function load(): Promise<State> {
   if (!supabase) {
     try {
       const raw = localStorage.getItem(LS)
-      if (raw) return JSON.parse(raw) as State
+      if (raw) { const x = JSON.parse(raw) as State; return { ...x, habits: x.habits ?? seedHabits(), habitLogs: x.habitLogs ?? [] } }
     } catch { /* fall through to fresh data */ }
     return empty()
   }
-  const [rules, tasks, events, snoozes] = await Promise.all([
+  const [rules, tasks, events, snoozes, habits, logs] = await Promise.all([
     supabase.from('rules').select('*').order('created_at'),
     supabase.from('tasks').select('*').order('created_at'),
     supabase.from('point_events').select('*').order('created_at'),
     supabase.from('snoozes').select('*'),
+    supabase.from('habits').select('*').order('sort'),
+    supabase.from('habit_logs').select('*').gte('day', new Date(Date.now() - 400 * 86400000).toISOString().slice(0, 10)),
   ])
   const err = rules.error || tasks.error || events.error || snoozes.error
   if (err) throw new Error(err.message)
-  return { rules: rules.data as Rule[], tasks: tasks.data as State['tasks'], events: events.data as State['events'], snoozes: snoozes.data as State['snoozes'] }
+  return { rules: rules.data as Rule[], tasks: tasks.data as State['tasks'], events: events.data as State['events'], snoozes: snoozes.data as State['snoozes'], habits: (habits.error ? [] : habits.data) as State['habits'], habitLogs: (logs.error ? [] : logs.data) as State['habitLogs'] }
 }
 
 export async function save(state: State, ops: Op[]): Promise<string | null> {
@@ -59,7 +64,7 @@ export async function save(state: State, ops: Op[]): Promise<string | null> {
       op.type === 'insert' ? await t.insert(op.row)
       : op.type === 'update' ? await t.update(op.patch).eq('id', op.id)
       : op.type === 'upsert' ? await t.upsert(op.row, { onConflict: op.onConflict })
-      : await t.delete().eq(op.key ?? 'id', op.id)
+      : await Object.entries(op.match).reduce((q, [k, v]) => q.eq(k, v), t.delete())
     if (res.error) return res.error.message
   }
   return null

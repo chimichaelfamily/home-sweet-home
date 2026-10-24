@@ -28,7 +28,7 @@ console.log('rules tests passed')
 // ---- actions ----
 import { addTask, complete, undo, monthPoints } from './actions.ts'
 import type { State } from './types.ts'
-const base: State = { rules: [mk('2025-09-01', 6, 'months')], tasks: [], events: [], snoozes: [] }
+const base: State = { rules: [mk('2025-09-01', 6, 'months')], tasks: [], events: [], snoozes: [], habits: [], habitLogs: [] }
 let r = addTask(base, 'Clean the oven', 'biggie')
 assert.equal(r.state.tasks.length, 1)
 const tid = r.state.tasks[0].id
@@ -43,3 +43,19 @@ let rr = complete(base, 'rule', base.rules[0].id, 'linh')
 assert.notEqual(rr.state.rules[0].last_done, '2025-09-01')
 assert.equal(undo(rr.state, rr.batch!).state.rules[0].last_done, '2025-09-01')
 console.log('actions tests passed')
+
+// ---- habits ----
+import { streak, longestInMonth } from './habits.ts'
+import { toggleHabit, addHabit } from './actions.ts'
+const dset = (...d: string[]) => new Set(d)
+assert.equal(streak(dset('2026-10-22', '2026-10-23', '2026-10-24'), '2026-10-24'), 3)
+assert.equal(streak(dset('2026-10-22', '2026-10-23'), '2026-10-24'), 2) // today not ticked yet keeps the streak
+assert.equal(streak(dset('2026-10-21'), '2026-10-24'), 0)
+assert.equal(longestInMonth(dset('2026-10-01', '2026-10-02', '2026-10-03', '2026-10-05'), '2026-10', '2026-10-24'), 3)
+let h = addHabit(base, 'linh', ' Walk ')
+const hid = h.state.habits[0].id
+assert.equal(h.state.habits[0].name, 'Walk')
+let tg = toggleHabit(h.state, hid, '2026-10-24')
+assert.equal(tg.state.habitLogs.length, 1)
+assert.equal(toggleHabit(tg.state, hid, '2026-10-24').state.habitLogs.length, 0)
+console.log('habit tests passed')

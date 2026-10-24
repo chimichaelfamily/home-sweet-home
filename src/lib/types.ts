@@ -1,4 +1,5 @@
 import type { Rule } from './rules.ts'
+import type { Habit, HabitLog } from './habits.ts'
 export type Size = 'baby' | 'biggie'
 export type Who = 'linh' | 'michael' | 'both'
 export const POINTS: Record<Size, number> = { baby: 1, biggie: 3 }
@@ -35,10 +36,12 @@ export interface State {
   tasks: Task[]
   events: PEvent[]
   snoozes: { rule_id: string; until: string }[]
+  habits: Habit[]
+  habitLogs: HabitLog[]
 }
 export type Op =
   | { table: string; type: 'insert'; row: Record<string, unknown> }
   | { table: string; type: 'update'; id: string; patch: Record<string, unknown> }
   | { table: string; type: 'upsert'; row: Record<string, unknown>; onConflict: string }
-  | { table: string; type: 'delete'; id: string; key?: string }
+  | { table: string; type: 'delete'; match: Record<string, string> }
 export const PEOPLE = { linh: 'Linh Chi', michael: 'Michael' } as const

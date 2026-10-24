@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { load, save, seedRules, supabase, usingDatabase } from './lib/backend.ts'
+import { emptyState, load, save, supabase, usingDatabase } from './lib/backend.ts'
+import { addMonthKey, daysInMonth, longestInMonth, monthLabel, streak, weatherText } from './lib/habits.ts'
 import * as A from './lib/actions.ts'
 import { addDays, diffDays, fmtLong, fmtShort, isoToYmd, today } from './lib/dates.ts'
 import { daysLate, headsUps, nextDue, status, type Rule, type Unit } from './lib/rules.ts'
 import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Who } from './lib/types.ts'
 
-type Tab = 'home' | 'reminders' | 'points' | 'settings'
+type Tab = 'home' | 'habits' | 'reminders' | 'points' | 'settings'
 type Pending = { kind: 'task' | 'rule'; id: string; title: string; size: Size } | null
 const THEMES = [
   { id: 'lilac', name: 'Lilac haze', note: 'Lavender, dusty pink' },
@@ -64,13 +65,14 @@ export default function App() {
     <div className="app">
       {error && <div className="card" style={{ padding: '10px 18px', color: 'var(--late)', fontWeight: 600 }}>{error} <button className="btn small outline" onClick={() => setError(null)}>Dismiss</button></div>}
       <div className="main">
-        {tab === 'home' && <Home s={state} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
+        {tab === 'home' && <Home s={state} apply={apply} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
+        {tab === 'habits' && <Habits s={state} apply={apply} />}
         {tab === 'reminders' && <Reminders s={state} apply={apply} onDone={setPending} />}
         {tab === 'points' && <Points s={state} apply={apply} />}
         {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['reminders', 'Reminders'], ['points', 'Points'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+        {([['home', 'Home'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['points', 'Points'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
@@ -121,10 +123,102 @@ function overdueList(s: State) {
   return s.rules.filter(r => status(r, t) === 'overdue' && !snoozed.has(r.id)).sort((a, b) => daysLate(b, t) - daysLate(a, t))
 }
 
-function Home({ s, onAdd, onTick, goReminders }: { s: State; onAdd: () => void; onTick: (p: NonNullable<Pending>) => void; goReminders: () => void }) {
+type Wx = { temp: number; text: string; hi: number; lo: number } | null
+function useWeather(): Wx {
+  const [w, setW] = useState<Wx>(null)
+  useEffect(() => {
+    let off = false
+    const go = () => fetch('https://api.open-meteo.com/v1/forecast?latitude=-37.81&longitude=144.96&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Australia%2FMelbourne&forecast_days=1')
+      .then(r => r.json()).then(j => { if (!off) setW({ temp: Math.round(j.current.temperature_2m), text: weatherText(j.current.weather_code), hi: Math.round(j.daily.temperature_2m_max[0]), lo: Math.round(j.daily.temperature_2m_min[0]) }) })
+      .catch(() => { /* offline: keep the last reading */ })
+    go(); const t = setInterval(go, 30 * 60000)
+    return () => { off = true; clearInterval(t) }
+  }, [])
+  return w
+}
+
+function HabitChips({ s, apply, who }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; who: 'linh' | 'michael' }) {
+  const t = today()
+  const hs = s.habits.filter(h => h.person_id === who && h.active).sort((a, b) => a.sort - b.sort)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+      {hs.map(h => {
+        const on = s.habitLogs.some(l => l.habit_id === h.id && l.day === t)
+        return <button key={h.id} aria-pressed={on} onClick={() => apply(A.toggleHabit(s, h.id, t))} style={{ height: 44, borderRadius: 999, fontSize: 16, fontWeight: 600, border: on ? 'none' : '1px solid var(--border)', background: on ? 'var(--accent)' : 'var(--faint)', color: on ? 'var(--on-accent)' : 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{on && <Check />}{h.name}</button>
+      })}
+    </div>
+  )
+}
+function PersonToggle({ who, setWho }: { who: 'linh' | 'michael'; setWho: (w: 'linh' | 'michael') => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
+      {(['linh', 'michael'] as const).map(p => <button key={p} onClick={() => setWho(p)} style={{ height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: who === p ? 'var(--accent)' : 'transparent', color: who === p ? 'var(--on-accent)' : 'var(--ink)' }}>{PEOPLE[p]}</button>)}
+    </div>
+  )
+}
+
+function Habits({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown> }) {
+  const t = today()
+  const [who, setWho] = useState<'linh' | 'michael'>('linh')
+  const [month, setMonth] = useState(t.slice(0, 7))
+  const hs = s.habits.filter(h => h.person_id === who && h.active).sort((a, b) => a.sort - b.sort)
+  const n = daysInMonth(month)
+  const elapsed = month === t.slice(0, 7) ? Number(t.slice(8, 10)) : month < t.slice(0, 7) ? n : 0
+  const set = (id: string) => new Set(s.habitLogs.filter(l => l.habit_id === id).map(l => l.day))
+  const sets = hs.map(h => set(h.id))
+  const dayKey = (d: number) => `${month}-${String(d).padStart(2, '0')}`
+  let perfect = 0, doneTotal = 0
+  for (let d = 1; d <= elapsed; d++) { const c = sets.filter(x => x.has(dayKey(d))).length; doneTotal += c; if (hs.length && c === hs.length) perfect++ }
+  const pct = elapsed && hs.length ? Math.round((doneTotal / (elapsed * hs.length)) * 100) : 0
+  const best = Math.max(0, ...sets.map(x => longestInMonth(x, month, t)))
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ fontSize: 36, fontWeight: 600 }}>Habits</div>
+        <button className="btn small outline" aria-label="Previous month" onClick={() => setMonth(addMonthKey(month, -1))}>‹</button>
+        <div style={{ fontSize: 22, fontWeight: 600, minWidth: 170, textAlign: 'center' }}>{monthLabel(month)}</div>
+        <button className="btn small outline" aria-label="Next month" onClick={() => setMonth(addMonthKey(month, 1))}>›</button>
+        <div style={{ flex: 1 }} /><PersonToggle who={who} setWho={setWho} />
+      </div>
+      <div style={{ display: 'flex', gap: 14 }}>
+        {[['Longest streak', `${best} days`], ['Perfect days', `${perfect} of ${elapsed}`], ['Done', `${pct}%`]].map(([a, b]) => (
+          <div key={a} className="card" style={{ flex: 1, padding: '14px 22px' }}><div className="muted" style={{ fontSize: 14, fontWeight: 600 }}>{a}</div><div style={{ fontSize: 30, fontWeight: 600 }}>{b}</div></div>
+        ))}
+      </div>
+      <div className="card scroll" style={{ flex: 1, padding: '14px 24px' }}>
+        {hs.length === 0 && <div className="muted" style={{ padding: 16, fontSize: 17 }}>No habits yet. Add some in Settings.</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: `170px repeat(${n}, 1fr) 100px`, alignItems: 'center', rowGap: 4 }}>
+          <div />{Array.from({ length: n }, (_, i) => <div key={i} className="muted" style={{ fontSize: 11, textAlign: 'center' }}>{i + 1}</div>)}<div className="muted" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>STREAK</div>
+          {hs.map((h, hi) => (
+            <HabitRow key={h.id} name={h.name} n={n} done={sets[hi]} dayKey={dayKey} today={t} streakN={streak(sets[hi], t)} onToggle={d => apply(A.toggleHabit(s, h.id, dayKey(d)))} />
+          ))}
+        </div>
+        <div className="muted" style={{ fontSize: 14, marginTop: 14 }}>Habits don't earn points. The streak counts days in a row, ending today. Tap any day to fix a mistake.</div>
+      </div>
+    </div>
+  )
+}
+function HabitRow({ name, n, done, dayKey, today: t, streakN, onToggle }: { name: string; n: number; done: Set<string>; dayKey: (d: number) => string; today: string; streakN: number; onToggle: (d: number) => void }) {
+  return (
+    <>
+      <div style={{ fontSize: 18, fontWeight: 600 }}>{name}</div>
+      {Array.from({ length: n }, (_, i) => {
+        const k = dayKey(i + 1); const on = done.has(k); const future = k > t
+        return <button key={i} aria-label={`${name} day ${i + 1}`} aria-pressed={on} disabled={future} onClick={() => onToggle(i + 1)} style={{ height: 36, border: 'none', background: 'transparent', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ width: 14, height: 14, borderRadius: '50%', background: on ? 'var(--accent)' : 'transparent', border: on ? 'none' : `1.5px solid ${future ? 'var(--border)' : k === t ? 'var(--accent)' : 'var(--mborder)'}`, opacity: future ? .5 : 1 }} />
+        </button>
+      })}
+      <div style={{ textAlign: 'right', fontSize: 16, fontWeight: 600 }}>{streakN} {streakN === 1 ? 'day' : 'days'}</div>
+    </>
+  )
+}
+
+function Home({ s, apply, onAdd, onTick, goReminders }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onAdd: () => void; onTick: (p: NonNullable<Pending>) => void; goReminders: () => void }) {
   const t = today()
   const now = new Date()
   const totals = monthTotals(s)
+  const wx = useWeather()
+  const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const todayTasks = s.tasks.filter(x => x.due_date <= t && (!x.done_at || isoToYmd(x.done_at) === t))
   const later = s.tasks.filter(x => x.due_date > t && !x.done_at)
   const over = overdueList(s)
@@ -183,15 +277,20 @@ function Home({ s, onAdd, onTick, goReminders }: { s: State; onAdd: () => void; 
             <div style={{ fontSize: 56, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{now.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: false })}</div>
             <div style={{ fontSize: 18, opacity: .9 }}>{now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
           </div>
-          <div style={{ fontSize: 16, opacity: .9, textAlign: 'right' }}>Weather comes with the<br />calendar step</div>
+          {wx ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ fontSize: 54, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{wx.temp}°</div>
+              <div><div style={{ fontSize: 19, fontWeight: 600 }}>{wx.text}</div><div style={{ fontSize: 15, opacity: .9 }}>H {wx.hi}° · L {wx.lo}°</div><div style={{ fontSize: 15, opacity: .9 }}>Melbourne</div></div>
+            </div>
+          ) : <div style={{ fontSize: 16, opacity: .9 }}>Melbourne weather loading…</div>}
         </div>
         <div className="card" style={{ flex: 1, padding: '20px 28px' }}>
           <div style={{ fontSize: 24, fontWeight: 600 }}>Schedule</div>
           <div className="muted" style={{ marginTop: 10, fontSize: 17, lineHeight: 1.5 }}>Your Google Calendars (Linh Chi | Michael) will appear here once we connect them. That's the next phase.</div>
         </div>
-        <div className="card" style={{ height: 170, flex: 'none', padding: '20px 28px' }}>
-          <div style={{ fontSize: 24, fontWeight: 600 }}>Habits</div>
-          <div className="muted" style={{ marginTop: 10, fontSize: 17, lineHeight: 1.5 }}>Daily habit chips arrive in the next phase.</div>
+        <div className="card" style={{ flex: 'none', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 24, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
+          <HabitChips s={s} apply={apply} who={hwho} />
         </div>
       </div>
     </div>
@@ -339,7 +438,9 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
 }
 
 function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'backup'>('look')
+  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'backup'>('look')
+  const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
+  const [newHabit, setNewHabit] = useState('')
   const [sel, setSel] = useState<string | null>(null)
   const t = today()
   const rule = s.rules.find(r => r.id === sel) ?? null
@@ -355,7 +456,7 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['backup', 'Backup']] as const).map(([id, l]) => (
+          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['backup', 'Backup']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
@@ -407,12 +508,28 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
               )}
             </div>
           )}
+          {sec === 'habits' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 560 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 30, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
+              {s.habits.filter(h => h.person_id === hwho && h.active).sort((a, b) => a.sort - b.sort).map(h => (
+                <div key={h.id} style={{ display: 'flex', gap: 10 }}>
+                  <input type="text" aria-label="Habit name" defaultValue={h.name} onBlur={e => { const v = e.target.value.trim(); if (v && v !== h.name) apply(A.updateHabit(s, h.id, { name: v })) }} />
+                  <button className="btn small outline" onClick={() => apply(A.updateHabit(s, h.id, { active: false }))}>Remove</button>
+                </div>
+              ))}
+              <form style={{ display: 'flex', gap: 10 }} onSubmit={e => { e.preventDefault(); if (newHabit.trim()) { apply(A.addHabit(s, hwho, newHabit)); setNewHabit('') } }}>
+                <input type="text" aria-label="New habit" placeholder="New habit, e.g. Walk 20 min" value={newHabit} onChange={e => setNewHabit(e.target.value)} />
+                <button className="btn small" type="submit">Add</button>
+              </form>
+              <div className="muted" style={{ fontSize: 14 }}>Removing a habit hides it. Its past days are kept.</div>
+            </div>
+          )}
           {sec === 'backup' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 520 }}>
               <div style={{ fontSize: 30, fontWeight: 600 }}>Backup</div>
               <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Downloads everything (tasks, points, rules) as one file you can keep. Do this about once a week.</div>
               <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={download}>Download backup</button>
-              {!usingDatabase && <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset demo data on this iPad?')) { try { localStorage.removeItem('home-sweet-home.v1') } catch { /* ignore */ } apply({ state: { rules: seedRules(), tasks: [], events: [], snoozes: [] }, ops: [] }) } }}>Reset demo data</button>}
+              {!usingDatabase && <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset demo data on this iPad?')) { try { localStorage.removeItem('home-sweet-home.v1') } catch { /* ignore */ } apply({ state: emptyState(), ops: [] }) } }}>Reset demo data</button>}
             </div>
           )}
         </div>
