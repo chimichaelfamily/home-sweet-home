@@ -310,6 +310,7 @@ function Schedule() {
         setLinks(l)
         const all: CalEvent[] = []
         if (l.linh) all.push(...await fetchCalendar(l.linh, 'linh', days[0], days[days.length - 1]))
+        if (l.michael) all.push(...await fetchCalendar(l.michael, 'michael', days[0], days[days.length - 1]))
         if (!off) { setEvents(all); setErr('') }
       } catch { if (!off) setErr('Could not refresh the calendar. Showing the last update.') }
     }
@@ -317,16 +318,22 @@ function Schedule() {
     return () => { off = true; clearInterval(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t])
-  const connected = links && links.linh
+  const [calTab, setCalTab] = useState<'linh' | 'michael'>('linh')
+  const connected = links && (links.linh || links.michael)
+  const tabHas = (k: 'linh' | 'michael') => !!links?.[k]
   return (
     <div className="card" style={{ flex: 1, padding: '16px 24px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ fontSize: 24, fontWeight: 600 }}>Schedule</div>
+        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
+          {([['linh', 'Household'], ['michael', 'Michael']] as const).map(([k, l]) => <button key={k} onClick={() => setCalTab(k)} style={{ height: 34, padding: '0 14px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 14, background: calTab === k ? 'var(--accent)' : 'transparent', color: calTab === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+        </div>
       </div>
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
+        {links && connected && !tabHas(calTab) && <div className="muted" style={{ fontSize: 15 }}>No {calTab === 'linh' ? 'household' : "Michael's"} calendar added yet. Settings → Calendars.</div>}
         {links && !connected && <div className="muted" style={{ fontSize: 16, lineHeight: 1.5 }}>No calendar yet. Open Settings → Calendars and paste the shared household calendar link.</div>}
-        {connected && days.map(d => {
-          const ev = events.filter(e => e.day === d).sort((a, b) => a.sort - b.sort)
+        {connected && tabHas(calTab) && days.map(d => {
+          const ev = events.filter(e => e.day === d && e.person === calTab).sort((a, b) => a.sort - b.sort)
           return (
             <div key={d} style={{ display: 'flex', gap: 14, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
               <div style={{ width: 62, flex: 'none', fontWeight: 700, fontSize: 15, color: d === t ? 'var(--accent)' : 'var(--ink)' }}>{d === t ? 'Today' : dowShort(d)}<div className="muted" style={{ fontSize: 12, fontWeight: 500 }}>{fmtShort(d)}</div></div>
@@ -356,10 +363,14 @@ function CalendarSettings() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
       <div style={{ fontSize: 30, fontWeight: 600 }}>Calendars</div>
-      <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>One calendar for both of you. In Google Calendar on a computer: Settings → click the shared calendar on the left → "Integrate calendar" → copy <b>Secret address in iCal format</b>. Paste it here. It is read-only. Outlook: Settings → Calendar → Shared calendars → Publish a calendar → ICS link. Anyone with a link can see that calendar, so keep it private.</div>
+      <div className="muted" style={{ fontSize: 15, lineHeight: 1.5 }}>Household is the shared one. Michael's is his own. In Google Calendar on a computer: Settings → click the shared calendar on the left → "Integrate calendar" → copy <b>Secret address in iCal format</b>. Paste it here. It is read-only. Outlook: Settings → Calendar → Shared calendars → Publish a calendar → ICS link. Anyone with a link can see that calendar, so keep it private.</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <label style={{ fontWeight: 600 }}>Household calendar link</label>
         <input type="text" defaultValue={links.linh} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.linh) save1('linh', e.target.value) }} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label style={{ fontWeight: 600 }}>Michael's calendar link</label>
+        <input type="text" defaultValue={links.michael} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.michael) save1('michael', e.target.value) }} />
       </div>
       {msg && <div style={{ fontSize: 14 }}>{msg}</div>}
     </div>
