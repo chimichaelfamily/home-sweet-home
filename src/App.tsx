@@ -294,16 +294,16 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
           {todayTasks.map(x => (
             <div className="row" key={x.id}>
               <button className={'circle' + (x.done_at ? ' done' : '')} aria-label={x.done_at ? `Undo ${x.title}` : `Tick ${x.title}`} onClick={() => x.done_at ? untick('task', x.id) : onTick({ kind: 'task', id: x.id, title: x.title, size: x.size })}>{x.done_at && <Check />}</button>
-              <div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', ...(x.done_at ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{x.title}</div>
+              <div role="button" onClick={() => x.done_at ? untick('task', x.id) : onTick({ kind: 'task', id: x.id, title: x.title, size: x.size })} style={{ flex: 1, fontSize: 20, cursor: 'pointer', ...(x.done_at ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{x.title}</div>
               {personTag(x.assignee) && <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>{personTag(x.assignee)}</span>}
-              <span className={'pill ' + x.size}>+{POINTS[x.size]}</span>
+              <span role="button" className={'pill ' + x.size} style={{ cursor: 'pointer' }} onClick={() => onEdit(x.id)}>+{POINTS[x.size]}</span>
               <button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button>
             </div>
           ))}
           {doneRulesToday.map(e => (
             <div className="row" key={e.id}>
               <button className="circle done" aria-label={`Undo ${e.title}`} onClick={() => untick('rule', e.rule_id!)}><Check /></button>
-              <div role="button" onClick={() => onEditRule(e.rule_id!)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', textDecoration: 'line-through', color: 'var(--muted)' }}>{e.title}</div>
+              <div role="button" onClick={() => untick('rule', e.rule_id!)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', textDecoration: 'line-through', color: 'var(--muted)' }}>{e.title}</div>
               <button className="more" aria-label={`Edit ${e.title}`} onClick={() => onEditRule(e.rule_id!)}><Pencil /></button>
             </div>
           ))}
@@ -316,7 +316,7 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
               {over.slice(0, 3).map(r => (
                 <div className="row" key={r.id} style={{ minHeight: 46 }}>
                   <button className="circle late" style={{ width: 30, height: 30 }} aria-label={`Tick ${r.name}`} onClick={() => onTick({ kind: 'rule', id: r.id, title: r.name, size: r.size })} />
-                  <div role="button" onClick={() => onEditRule(r.id)} style={{ flex: 1, fontSize: 19, fontWeight: 500, cursor: 'pointer' }}>{r.name}</div>
+                  <div role="button" onClick={() => onTick({ kind: 'rule', id: r.id, title: r.name, size: r.size })} style={{ flex: 1, fontSize: 19, fontWeight: 500, cursor: 'pointer' }}>{r.name}</div>
                   <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--late)' }}>{daysLate(r, t)} days late</span>
                   <button className="more" aria-label={`Edit ${r.name}`} onClick={() => onEditRule(r.id)}><Pencil /></button>
                 </div>
@@ -325,7 +325,7 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
           )}
           {later.length > 0 && <div className="head" style={{ marginTop: 12 }}>LATER</div>}
           {later.map(x => (
-            <div className="row" key={x.id}><div className="circle" /><div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer' }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span><button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button></div>
+            <div className="row" key={x.id}><div className="circle" /><div style={{ flex: 1, fontSize: 20 }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span role="button" className={'pill ' + x.size} style={{ cursor: 'pointer' }} onClick={() => onEdit(x.id)}>+{POINTS[x.size]}</span><button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button></div>
           ))}
         </div>
         <button onClick={onAdd} style={{ marginTop: 8, height: 56, borderRadius: 16, border: '1.5px dashed var(--mborder)', background: 'transparent', fontSize: 19, fontWeight: 600 }}>+ Add task</button>
