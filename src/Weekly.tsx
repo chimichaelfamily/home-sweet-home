@@ -6,6 +6,7 @@ import { mondayOf, weekly } from './lib/weekly.ts'
 import { supabase } from './lib/backend.ts'
 import { logError } from './lib/errorlog.ts'
 import { askAI } from './lib/ai.ts'
+import { Face } from './Face.tsx'
 import { loadPrivate, money, type PItem } from './lib/privateData.ts'
 
 const KEY = 'home-sweet-home.weekly.v1'
@@ -51,11 +52,51 @@ ${withGoals ? goalsText() : ''}`
     try { const a = await askAI([{ role: 'user', text: prompt() }]); setNote(a); setDraft(a); await saveNote(key, a); setMsg('Written and saved.') }
     catch (e) { logError('Report: writing', e); setMsg((e as Error).message) } finally { setWriting(false) }
   }
-  const stat = (label: string, a: string, b: string) => (
-    <div className="card" style={{ flex: 1, padding: '14px 18px' }}>
-      <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>{label}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 700, marginTop: 4 }}><span style={{ color: 'var(--accent)' }}>{a}</span><span style={{ color: 'var(--blue-bd)' }}>{b}</span></div>
+  const COL = { linh: 'var(--accent)', michael: 'var(--blue-bd)' } as const
+  const DAY = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const dayLetter = (d: string) => ['S', 'M', 'T', 'W', 'T', 'F', 'S'][new Date(d + 'T00:00:00').getDay()]
+  const maxDay = Math.max(1, ...L.pointsByDay, ...M.pointsByDay)
+  void DAY
+  const total = Math.max(1, L.points + M.points)
+  const Tile = ({ who, p }: { who: 'linh' | 'michael'; p: typeof L }) => (
+    <div className="card" style={{ flex: 1, padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <Face who={who} size={56} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: COL[who] }}>{p.points}</div>
+          <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>POINTS</div>
+        </div>
+        {w.leader === who && <span style={{ fontSize: 28 }} aria-label="Leader">👑</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        {[['Tasks', String(p.tasks)], ['Habits', `${p.habitPct}%`], ['Perfect days', String(p.perfectDays)], ['Best streak', `${p.bestStreak}d`]].map(([l, v]) => (
+          <div key={l} style={{ flex: 1, background: 'var(--ground)', borderRadius: 14, padding: '8px 6px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{v}</div>
+            <div className="muted" style={{ fontSize: 12 }}>{l}</div>
+          </div>
+        ))}
+      </div>
+      <div>
+        <div style={{ height: 12, borderRadius: 6, background: 'var(--ground)', overflow: 'hidden' }}><div style={{ width: `${p.habitPct}%`, height: '100%', background: COL[who] }} /></div>
+        <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Habits completed</div>
+      </div>
     </div>)
+  const Grid = ({ who, p }: { who: 'linh' | 'michael'; p: typeof L }) => (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}><Face who={who} size={28} /><span style={{ fontWeight: 600, fontSize: 16 }}>{PEOPLE[who]}</span></div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) repeat(7, 22px)', gap: '6px 5px', alignItems: 'center' }}>
+        <span />{w.days.map(d => <span key={d} className="muted" style={{ fontSize: 11, textAlign: 'center' }}>{dayLetter(d)}</span>)}
+        {p.habits.map(h => (
+          <div key={h.name} style={{ display: 'contents' }}>
+            <span style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.name}</span>
+            {h.done.map((d, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: '50%', background: d ? COL[who] : 'var(--ground)', border: '1px solid var(--border)' }} />)}
+          </div>
+        ))}
+        {p.habits.length === 0 && <span className="muted" style={{ gridColumn: '1 / -1', fontSize: 14 }}>No habits yet</span>}
+      </div>
+    </div>)
+  const Chip = ({ children, late }: { children: React.ReactNode; late?: boolean }) => (
+    <span style={{ padding: '6px 14px', borderRadius: 999, fontSize: 15, fontWeight: 500, background: late ? 'var(--late-bg, var(--ground))' : 'var(--ground)', color: late ? 'var(--late)' : 'var(--ink)', border: '1px solid var(--border)' }}>{children}</span>)
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -65,24 +106,42 @@ ${withGoals ? goalsText() : ''}`
         <button className="btn small outline" aria-label="Later week" disabled={offset === 0} onClick={() => setOffset(offset - 1)}>›</button>
       </div>
       <div className="scroll" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>{w.leader === 'tie' ? 'It was a tie this week' : `${PEOPLE[w.leader]} led the race this week`}</div>
-          <div className="muted" style={{ marginTop: 4, fontSize: 15 }}>{PEOPLE.linh} {L.points} points · {PEOPLE.michael} {M.points} points</div>
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          {stat('TASKS DONE', String(L.tasks), String(M.tasks))}
-          {stat('HABITS DONE', `${L.habitPct}%`, `${M.habitPct}%`)}
-          {stat('PERFECT HABIT DAYS', String(L.perfectDays), String(M.perfectDays))}
-          {stat('BEST STREAK', `${L.bestStreak}d`, `${M.bestStreak}d`)}
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div className="card" style={{ flex: 1, padding: 20 }}>
-            <div style={{ fontSize: 19, fontWeight: 600 }}>Overdue ({w.overdue.length})</div>
-            <div className="muted" style={{ fontSize: 15, marginTop: 6 }}>{w.overdue.slice(0, 5).join(' · ') || 'Nothing overdue'}{w.overdue.length > 5 ? ` · and ${w.overdue.length - 5} more` : ''}</div>
+        <div style={{ display: 'flex', gap: 12 }}><Tile who="linh" p={L} /><Tile who="michael" p={M} /></div>
+        <div className="card" style={{ padding: 18 }}>
+          <div style={{ display: 'flex', height: 18, borderRadius: 9, overflow: 'hidden', background: 'var(--ground)' }}>
+            <div style={{ width: `${(L.points / total) * 100}%`, background: COL.linh }} />
+            <div style={{ width: `${(M.points / total) * 100}%`, background: COL.michael }} />
           </div>
-          <div className="card" style={{ flex: 1, padding: 20 }}>
-            <div style={{ fontSize: 19, fontWeight: 600 }}>Coming up (next 7 days)</div>
-            <div className="muted" style={{ fontSize: 15, marginTop: 6 }}>{w.comingUp.map(c => `${c.name} (${fmtShort(c.due)})`).join(' · ') || 'Nothing due'}</div>
+        </div>
+        <div className="card" style={{ padding: 18 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>Points each day</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 150 }}>
+            {w.days.map((d, i) => (
+              <div key={d} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, width: '100%', height: 110, justifyContent: 'center' }}>
+                  {(['linh', 'michael'] as const).map(who => { const v = w.people[who].pointsByDay[i]; return (
+                    <div key={who} title={`${PEOPLE[who]} ${v}`} style={{ width: '38%', maxWidth: 28, height: `${(v / maxDay) * 100}%`, minHeight: v ? 4 : 0, background: COL[who], borderRadius: '6px 6px 0 0' }} />) })}
+                </div>
+                <span className="muted" style={{ fontSize: 13 }}>{dayLetter(d)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card" style={{ padding: 18 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>Habits this week</div>
+          <div style={{ display: 'flex', gap: 28 }}><Grid who="linh" p={L} /><Grid who="michael" p={M} /></div>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div className="card" style={{ flex: 1, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}><span style={{ fontSize: 40, fontWeight: 700, color: w.overdue.length ? 'var(--late)' : 'var(--ink)' }}>{w.overdue.length}</span><span style={{ fontSize: 17, fontWeight: 600 }}>overdue</span></div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>{w.overdue.slice(0, 6).map(n => <Chip key={n} late>{n}</Chip>)}{w.overdue.length > 6 && <Chip>+{w.overdue.length - 6}</Chip>}</div>
+          </div>
+          <div className="card" style={{ flex: 1, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}><span style={{ fontSize: 40, fontWeight: 700 }}>{w.comingUp.length}</span><span style={{ fontSize: 17, fontWeight: 600 }}>due in 7 days</span></div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>{w.comingUp.slice(0, 6).map(c => <Chip key={c.name}>{c.name} · {fmtShort(c.due)}</Chip>)}</div>
+          </div>
+          <div className="card" style={{ flex: 1, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}><span style={{ fontSize: 40, fontWeight: 700 }}>{w.open.length}</span><span style={{ fontSize: 17, fontWeight: 600 }}>open tasks</span></div>
           </div>
         </div>
         <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>

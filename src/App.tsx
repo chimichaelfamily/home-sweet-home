@@ -34,6 +34,7 @@ export default function App() {
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('hsh.theme') || 'lilac' } catch { return 'lilac' } })
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
+  const [editingRule, setEditingRule] = useState<string | null>(null)
   const [pending, setPending] = useState<Pending>(null)
   const stateRef = useRef<State | null>(null)
   stateRef.current = state
@@ -80,7 +81,7 @@ export default function App() {
     <div className="app">
       {error && <div className="card" style={{ padding: '10px 18px', color: 'var(--late)', fontWeight: 600 }}>{error} <button className="btn small outline" onClick={() => setError(null)}>Dismiss</button></div>}
       <div className="main">
-        {tab === 'home' && <Home s={state} apply={apply} onEdit={setEditing} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
+        {tab === 'home' && <Home s={state} apply={apply} onEdit={setEditing} onEditRule={setEditingRule} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
         {tab === 'habits' && <Habits s={state} apply={apply} />}
         {tab === 'calendar' && <MonthCalendar />}
         {tab === 'morning' && <Morning />}
@@ -106,6 +107,15 @@ export default function App() {
           onSave={(title, size) => { setEditing(null); apply(A.editTask(state, tk.id, { title, size })) }}
           onDelete={() => { setEditing(null); apply(A.deleteTask(state, tk.id)) }}
           onUndo={() => { setEditing(null); apply(A.undo(state, live[0].batch)) }} />
+      })()}
+      {editingRule && (() => {
+        const r = state.rules.find(x => x.id === editingRule)
+        if (!r) return null
+        const t0 = today()
+        const live = state.events.filter(e => e.rule_id === r.id && !e.undone_at && isoToYmd(e.created_at) === t0)
+        return <EditRuleQuick key={r.id} r={r} canUndo={live.length > 0} onClose={() => setEditingRule(null)}
+          onSave={(name, size) => { setEditingRule(null); apply(A.updateRule(state, r.id, { name, size })) }}
+          onUndo={() => { setEditingRule(null); apply(A.undo(state, live[0].batch)) }} />
       })()}
       {pending && <WhoDid p={pending} onPick={w => doComplete(pending, w)} onClose={() => setPending(null)} />}
     </div>
@@ -231,7 +241,6 @@ function Habits({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
             <HabitRow key={h.id} name={h.name} n={n} done={sets[hi]} dayKey={dayKey} today={t} streakN={streak(sets[hi], t)} onToggle={d => apply(A.toggleHabit(s, h.id, dayKey(d)))} />
           ))}
         </div>
-        <div className="muted" style={{ fontSize: 14, marginTop: 14 }}>Habits don't earn points. The streak counts days in a row, ending today. Tap any day to fix a mistake.</div>
       </div>
     </div>
   )
@@ -251,12 +260,13 @@ function HabitRow({ name, n, done, dayKey, today: t, streakN, onToggle }: { name
   )
 }
 
-function Home({ s, apply, onEdit, onAdd, onTick, goReminders }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onEdit: (id: string) => void; onAdd: () => void; onTick: (p: NonNullable<Pending>) => void; goReminders: () => void }) {
+function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onEdit: (id: string) => void; onEditRule: (id: string) => void; onAdd: () => void; onTick: (p: NonNullable<Pending>) => void; goReminders: () => void }) {
   const t = today()
   const now = new Date()
   const totals = monthTotals(s)
   const wx = useWeather()
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
+  const doneRulesToday = [...new Map(s.events.filter(e => e.rule_id && !e.undone_at && isoToYmd(e.created_at) === t).map(e => [e.rule_id!, e])).values()]
   const todayTasks = s.tasks.filter(x => x.due_date <= t && (!x.done_at || isoToYmd(x.done_at) === t))
   const later = s.tasks.filter(x => x.due_date > t && !x.done_at)
   const over = overdueList(s)
@@ -272,9 +282,6 @@ function Home({ s, apply, onEdit, onAdd, onTick, goReminders }: { s: State; appl
             <div className="pill" style={{ background: 'var(--blue-bg)', border: '1.5px solid var(--blue-bd)', color: 'var(--blue-tx)', fontSize: 16, padding: '4px 14px 4px 5px', display: 'flex', alignItems: 'center', gap: 8 }}><Face who="michael" size={30} /><b style={{ fontSize: 22 }}>{totals.michael}</b></div>
           </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }} className="muted">
-          <span style={{ fontSize: 15 }}>{doneCount} of {todayTasks.length} done today</span><span style={{ fontSize: 15 }}>Points this month</span>
-        </div>
         <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
           <div className="head" style={{ marginTop: 4 }}>TODAY</div>
           {todayTasks.length === 0 && <div className="muted" style={{ padding: '14px 0', fontSize: 17 }}>Nothing yet. Add a task below.</div>}
@@ -284,6 +291,14 @@ function Home({ s, apply, onEdit, onAdd, onTick, goReminders }: { s: State; appl
               <div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', ...(x.done_at ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{x.title}</div>
               {personTag(x.assignee) && <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>{personTag(x.assignee)}</span>}
               <span className={'pill ' + x.size}>+{POINTS[x.size]}</span>
+              <button className="more" aria-label={`Options for ${x.title}`} onClick={() => onEdit(x.id)}>⋯</button>
+            </div>
+          ))}
+          {doneRulesToday.map(e => (
+            <div className="row" key={e.id}>
+              <button className="circle done" aria-label="Done" onClick={() => onEditRule(e.rule_id!)}><Check /></button>
+              <div role="button" onClick={() => onEditRule(e.rule_id!)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', textDecoration: 'line-through', color: 'var(--muted)' }}>{e.title}</div>
+              <button className="more" aria-label={`Options for ${e.title}`} onClick={() => onEditRule(e.rule_id!)}>⋯</button>
             </div>
           ))}
           {over.length > 0 && (
@@ -295,16 +310,16 @@ function Home({ s, apply, onEdit, onAdd, onTick, goReminders }: { s: State; appl
               {over.slice(0, 3).map(r => (
                 <div className="row" key={r.id} style={{ minHeight: 46 }}>
                   <button className="circle late" style={{ width: 30, height: 30 }} aria-label={`Tick ${r.name}`} onClick={() => onTick({ kind: 'rule', id: r.id, title: r.name, size: r.size })} />
-                  <div style={{ flex: 1, fontSize: 19, fontWeight: 500 }}>{r.name}</div>
+                  <div role="button" onClick={() => onEditRule(r.id)} style={{ flex: 1, fontSize: 19, fontWeight: 500, cursor: 'pointer' }}>{r.name}</div>
                   <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--late)' }}>{daysLate(r, t)} days late</span>
-                  <span className={'pill ' + r.size}>+{POINTS[r.size]}</span>
+                  <button className="more" aria-label={`Options for ${r.name}`} onClick={() => onEditRule(r.id)}>⋯</button>
                 </div>
               ))}
             </>
           )}
           {later.length > 0 && <div className="head" style={{ marginTop: 12 }}>LATER</div>}
           {later.map(x => (
-            <div className="row" key={x.id}><div className="circle" /><div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer' }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span></div>
+            <div className="row" key={x.id}><div className="circle" /><div role="button" onClick={() => onEdit(x.id)} style={{ flex: 1, fontSize: 20, cursor: 'pointer' }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span className={'pill ' + x.size}>+{POINTS[x.size]}</span><button className="more" aria-label={`Options for ${x.title}`} onClick={() => onEdit(x.id)}>⋯</button></div>
           ))}
         </div>
         <button onClick={onAdd} style={{ marginTop: 8, height: 56, borderRadius: 16, border: '1.5px dashed var(--mborder)', background: 'transparent', fontSize: 19, fontWeight: 600 }}>+ Add task</button>
@@ -545,6 +560,26 @@ function EditTask({ t, done, onSave, onDelete, onUndo, onClose }: { t: Task; don
   )
 }
 
+function EditRuleQuick({ r, canUndo, onSave, onUndo, onClose }: { r: Rule; canUndo: boolean; onSave: (name: string, size: Size) => void; onUndo: () => void; onClose: () => void }) {
+  const [name, setName] = useState(r.name)
+  const [size, setSize] = useState<Size>(r.size)
+  return (
+    <div className="overlay" onClick={onClose}><div className="dialog" style={{ width: 480 }} onClick={e => e.stopPropagation()}>
+      <div style={{ fontSize: 30, fontWeight: 600 }}>Edit reminder</div>
+      <input type="text" aria-label="Name" value={name} onChange={e => setName(e.target.value)} />
+      <div style={{ display: 'flex', gap: 10 }}>
+        {(['baby', 'biggie'] as Size[]).map(z => <button key={z} onClick={() => setSize(z)} style={{ flex: 1, height: 56, borderRadius: 18, fontSize: 18, fontWeight: 600, border: '2px solid ' + (size === z ? 'var(--accent)' : 'var(--border)'), background: size === z ? 'var(--accent)' : 'var(--card)', color: size === z ? 'var(--on-accent)' : 'var(--ink)' }}>{SIZE_LABEL[z]} · +{POINTS[z]}</button>)}
+      </div>
+      {canUndo && <button className="btn outline" onClick={onUndo}>Mark as not done (take points back)</button>}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ flex: 1 }} />
+        <button className="btn ghost" onClick={onClose}>Cancel</button>
+        <button className="btn" disabled={!name.trim()} onClick={() => onSave(name.trim(), size)}>Save</button>
+      </div>
+    </div></div>
+  )
+}
+
 function WhoDid({ p, onPick, onClose }: { p: NonNullable<Pending>; onPick: (w: Who) => void; onClose: () => void }) {
   const pts = POINTS[p.size]
   const opts: [Who, string, string, string][] = [['linh', 'Linh Chi', 'L', `+${pts}`], ['michael', 'Michael', 'M', `+${pts}`], ['both', 'Both of us', 'L+M', `+${pts} each`]]
@@ -568,29 +603,29 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
   const [menu, setMenu] = useState<string | null>(null)
   const snoozedUntil = (id: string) => s.snoozes.find(z => z.rule_id === id && z.until > t)?.until
   const kept = s.rules.filter(r => r.keep && r.last_done)
-  const over = kept.filter(r => status(r, t) === 'overdue').sort((a, b) => daysLate(b, t) - daysLate(a, t))
-  const rest = kept.filter(r => status(r, t) !== 'overdue').sort((a, b) => (nextDue(a)! < nextDue(b)! ? -1 : 1))
+  const snoozed = kept.filter(r => snoozedUntil(r.id)).sort((a, b) => (snoozedUntil(a.id)! < snoozedUntil(b.id)! ? -1 : 1))
+  const active = kept.filter(r => !snoozedUntil(r.id))
+  const over = active.filter(r => status(r, t) === 'overdue').sort((a, b) => daysLate(b, t) - daysLate(a, t))
+  const rest = active.filter(r => status(r, t) !== 'overdue').sort((a, b) => (nextDue(a)! < nextDue(b)! ? -1 : 1))
   const [all, setAll] = useState(false)
   const coming = rest.filter(r => diffDays(nextDue(r)!, t) <= 14)
   const later = rest.filter(r => diffDays(nextDue(r)!, t) > 14)
+  const snoozeTo = (id: string, d: string) => { setMenu(null); apply(A.snooze(s, id, d)) }
   const Row = ({ r, isOver }: { r: Rule; isOver: boolean }) => {
-    const due = nextDue(r)!; const sn = snoozedUntil(r.id); const h = headsUps(r)
-    const nextHeads = [h.monthBefore, h.weeksBefore].filter((x): x is string => !!x && x >= t)[0]
+    const due = nextDue(r)!
     return (
       <div className="row" style={{ minHeight: 62, position: 'relative' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 20, fontWeight: 500 }}>{r.name}</div>
-          <div className="muted" style={{ fontSize: 14 }}>{r.category} · {isOver ? `was due ${fmtShort(due)}` : `every ${r.every_n} ${r.unit}`}{!isOver && nextHeads ? ` · next heads-up ${fmtShort(nextHeads)}` : ''}{sn ? ` · snoozed until ${fmtShort(sn)}` : ''}</div>
-        </div>
-        <div style={{ width: 170, fontSize: 16, fontWeight: 500, color: isOver ? 'var(--late)' : 'var(--muted)' }}>{isOver ? `${daysLate(r, t)} days late` : `${fmtLong(due)}`}</div>
-        <span className={'pill ' + r.size}>{SIZE_LABEL[r.size]} +{POINTS[r.size]}</span>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 20, fontWeight: 500 }}>{r.name}</div>
+        <div style={{ width: 170, fontSize: 16, fontWeight: 500, color: isOver ? 'var(--late)' : 'var(--muted)' }}>{isOver ? `${daysLate(r, t)} days late` : fmtLong(due)}</div>
         {isOver && <button className="btn small outline" onClick={() => setMenu(menu === r.id ? null : r.id)}>Snooze</button>}
         <button className="btn small" onClick={() => onDone({ kind: 'rule', id: r.id, title: r.name, size: r.size })}>Done</button>
         {menu === r.id && (
-          <div className="card" style={{ position: 'absolute', right: 90, top: 52, zIndex: 5, padding: 8, display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,.2)' }}>
-            {[['Tomorrow', 1], ['Next week', 7]].map(([l, d]) => (
-              <button key={l as string} className="btn small outline" onClick={() => { setMenu(null); apply(A.snooze(s, r.id, addDays(t, d as number))) }}>{l}</button>
+          <div className="card" style={{ position: 'absolute', right: 90, top: 52, zIndex: 5, padding: 10, display: 'flex', flexDirection: 'column', gap: 6, boxShadow: '0 8px 24px rgba(0,0,0,.2)', width: 220 }}>
+            {[['Tomorrow', 1], ['In 3 days', 3], ['Next week', 7], ['In 2 weeks', 14], ['In a month', 30]].map(([l, d]) => (
+              <button key={l as string} className="btn small outline" onClick={() => snoozeTo(r.id, addDays(t, d as number))}>{l}</button>
             ))}
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>Or pick a day</div>
+            <input type="date" min={addDays(t, 1)} aria-label="Snooze until" onChange={e => e.target.value && snoozeTo(r.id, e.target.value)} style={{ height: 48, fontSize: 16, borderRadius: 12, border: '2px solid var(--border)', padding: '0 8px' }} />
           </div>
         )}
       </div>
@@ -601,13 +636,25 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
   ) : null
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Reminders</div><div className="muted" style={{ fontSize: 17 }}>{over.length} overdue · {coming.length} coming up · shared by both of you</div></div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Reminders</div><div className="muted" style={{ fontSize: 17 }}>{over.length} overdue · {coming.length} coming up</div></div>
       <div className="card scroll" style={{ flex: 1, padding: '6px 28px 24px' }}>
         <Section label="OVERDUE · MOST LATE FIRST" list={over} isOver color="var(--late)" />
         <Section label="COMING UP · NEXT 2 WEEKS" list={coming} isOver={false} />
         {over.length === 0 && coming.length === 0 && <div className="muted" style={{ padding: '18px 0', fontSize: 17 }}>Nothing overdue and nothing due in the next 2 weeks.</div>}
         {all && <Section label="LATER" list={later} isOver={false} />}
         {later.length > 0 && <button className="btn small outline" style={{ marginTop: 16 }} onClick={() => setAll(!all)}>{all ? 'Show less' : `See all (${later.length} more)`}</button>}
+        {snoozed.length > 0 && (
+          <>
+            <div className="head" style={{ margin: '22px 0 2px' }}>SNOOZED</div>
+            {snoozed.map(r => (
+              <div className="row" key={r.id} style={{ minHeight: 62 }}>
+                <div style={{ flex: 1, fontSize: 20, fontWeight: 500 }}>{r.name}</div>
+                <div className="muted" style={{ width: 170, fontSize: 16 }}>back {fmtLong(snoozedUntil(r.id)!)}</div>
+                <button className="btn small outline" onClick={() => apply(A.unsnooze(s, r.id))}>Undo snooze</button>
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </div>
   )
@@ -616,17 +663,14 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
 function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown> }) {
   const [filter, setFilter] = useState<'all' | 'linh' | 'michael'>('all')
   const tot = monthTotals(s)
-  const lead = tot.linh === tot.michael ? 'Level' : tot.linh > tot.michael ? 'linh' : 'michael'
   const month = new Date().toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })
-  const daysLeft = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() - d.getDate() })()
   const evs = s.events.filter(e => isoToYmd(e.created_at).slice(0, 7) === monthKey() && (filter === 'all' || e.person_id === filter)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
   const Lane = ({ who }: { who: 'linh' | 'michael' }) => {
     const pts = tot[who]; const frac = Math.min(pts, 100) / 100; const me = who === 'linh'
-    const note = lead === 'Level' ? 'Level' : lead === who ? `Leading by ${Math.abs(tot.linh - tot.michael)}` : `${Math.abs(tot.linh - tot.michael)} behind`
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, height: 84 }}>
         <Face who={who} size={72} />
-        <div style={{ width: 110, flex: 'none' }}><div style={{ fontSize: 18, fontWeight: 600 }}>{note}</div></div>
+        
         <div style={{ flex: 1, position: 'relative', height: 60 }}>
           <div style={{ position: 'absolute', left: 0, right: 0, top: 20, height: 26, borderRadius: 13, background: 'var(--ground)', border: '1px solid var(--border)' }} />
           <div style={{ position: 'absolute', left: 0, top: 20, height: 26, borderRadius: 13, width: `calc((100% - 64px) * ${frac} + 40px)`, background: me ? 'var(--accent)' : 'var(--blue-bd)' }} />
@@ -639,10 +683,9 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
       </div>
     )
   }
-  const undoBatch = (e: PEvent) => apply(A.undo(s, e.batch))
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Points</div><div style={{ fontSize: 22, fontWeight: 600 }}>{month}</div><div style={{ flex: 1 }} /><div className="muted" style={{ fontSize: 18 }}>Month ends in {daysLeft} days · winner takes the reward</div></div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Points</div><div style={{ fontSize: 22, fontWeight: 600 }}>{month}</div></div>
       <div className="card" style={{ padding: '16px 28px', flex: 'none' }}><Lane who="linh" /><Lane who="michael" /></div>
       <div className="card" style={{ flex: 1, minHeight: 0, padding: '18px 28px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -659,7 +702,6 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
               <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, background: e.person_id === 'linh' ? 'var(--accent)' : 'var(--blue-bg)', color: e.person_id === 'linh' ? 'var(--on-accent)' : 'var(--blue-tx)' }}>{e.person_id === 'linh' ? 'L' : 'M'}</div>
               <div style={{ flex: 1 }}><div style={{ fontSize: 20, fontWeight: 600, textDecoration: e.undone_at ? 'line-through' : 'none' }}>{e.title}</div><div className="muted" style={{ fontSize: 15 }}>{[e.category, SIZE_LABEL[e.size], e.shared ? 'done together' : null].filter(Boolean).join(' · ')}</div></div>
               <span className={'pill ' + e.size}>+{e.points}{e.shared ? ' each' : ''}</span>
-              {!e.undone_at && <button className="btn small outline" onClick={() => undoBatch(e)}>Undo</button>}
             </div>
           ))}
         </div>
@@ -762,7 +804,6 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
                 <input type="text" aria-label="New habit" placeholder="New habit, e.g. Walk 20 min" value={newHabit} onChange={e => setNewHabit(e.target.value)} />
                 <button className="btn small" type="submit">Add</button>
               </form>
-              <div className="muted" style={{ fontSize: 14 }}>Removing a habit hides it. Its past days are kept.</div>
             </div>
           )}
           {sec === 'errors' && (

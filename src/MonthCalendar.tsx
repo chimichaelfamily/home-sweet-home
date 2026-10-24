@@ -44,7 +44,6 @@ export function MonthCalendar() {
           })}
         </div>
       </div>
-      <div className="muted" style={{ fontSize: 13 }}>Small number = lunar (âm lịch) day. On the 1st of each lunar month it shows day/month.</div>
     </div>
   )
 }

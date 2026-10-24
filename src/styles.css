@@ -110,3 +110,6 @@ html[data-mode='dark'] .toast { background: #F2EDF9; color: #201C2B; }
 @keyframes wx-fog { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
 @keyframes wx-flash { 0%,92%,100% { opacity: 0; } 93% { opacity: .8; } 95% { opacity: .1; } 96% { opacity: .6; } 98% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .wx-layer i { animation: none !important; } }
+
+.more { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; font-size: 26px; line-height: 1; color: var(--muted); flex: none; padding: 0; }
+.more:active { background: var(--faint); }

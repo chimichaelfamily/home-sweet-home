@@ -90,6 +90,8 @@ import { mondayOf, weekly } from './weekly.ts'
     events: [{ id: 'e', person_id: 'michael' as const, points: 3, title: 't', category: null, size: 'biggie' as const, shared: false, task_id: null, rule_id: null, batch: 'b', prev_last_done: null, created_at: '2026-10-24T01:00:00Z', undone_at: null }] }
   const w = weekly(st as never, '2026-10-25')
   assert.strictEqual(w.people.michael.points, 3); assert.strictEqual(w.leader, 'michael')
+  assert.deepStrictEqual(w.people.michael.pointsByDay, [0, 0, 0, 0, 0, 3, 0])
+  assert.deepStrictEqual(w.people.linh.habits[0].done, [false, false, false, false, true, true, true])
   assert.strictEqual(w.people.linh.perfectDays, 3); assert.strictEqual(w.people.linh.bestStreak, 3)
   console.log('weekly tests passed')
 }

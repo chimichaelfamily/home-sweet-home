@@ -122,3 +122,7 @@ export function deleteTask(s: State, id: string): Result {
   ops.push({ table: 'tasks', type: 'delete', match: { id } })
   return { state: { ...s, tasks: s.tasks.filter(t => t.id !== id), events: s.events.map(e => (e.task_id === id && !e.undone_at ? { ...e, undone_at: now } : e)) }, ops }
 }
+
+export function unsnooze(s: State, ruleId: string): Result {
+  return { state: { ...s, snoozes: s.snoozes.filter(z => z.rule_id !== ruleId) }, ops: [{ table: 'snoozes', type: 'delete', match: { rule_id: ruleId } }] }
+}
