@@ -43,8 +43,40 @@ button { cursor: pointer; }
 .toast .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.25); overflow: hidden; }
 .toast .bar i { display: block; height: 4px; background: #fff; animation: shrink 6s linear forwards; }
 @keyframes shrink { from { width: 100%; } to { width: 0; } }
-input[type=text], input[type=password], input[type=email], input[type=date], input[type=number], select { height: 56px; border-radius: 16px; border: 2px solid var(--border); padding: 0 18px; font-size: 20px; background: #fff; width: 100%; user-select: text; }
+input[type=text], input[type=password], input[type=email], input[type=date], input[type=number], select, textarea { height: 56px; border-radius: 16px; border: 2px solid var(--border); padding: 0 18px; font-size: 20px; background: var(--card); color: var(--ink); width: 100%; user-select: text; }
 input:focus, select:focus { outline: none; border-color: var(--accent); }
 label { font-size: 14px; font-weight: 600; color: var(--muted); }
 .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
 a.btn { display: inline-flex; align-items: center; }
+
+/* Dark mode (any theme) */
+html[data-mode='dark'] { color-scheme: dark; }
+html[data-mode='dark'][data-theme] {
+  --ground:#16131F; --card:#201C2B; --border:#383250; --row:#2D2840; --faint:#2A2538;
+  --muted:#B5ACC9; --mborder:#6E6490; --ink:#F2EDF9; --on-accent:#FFFFFF; --on-accent-muted:#E7D3E0;
+  --late:#E58AAE; --blue-bg:#283057; --blue-bd:#8FA3F0; --blue-tx:#C9D3FF;
+}
+html[data-mode='dark'][data-theme='lilac'] { --accent:#B8618A; --g2:#5870C9; }
+html[data-mode='dark'][data-theme='warm'] { --accent:#A8667E; --g2:#8A5A6B; }
+html[data-mode='dark'][data-theme='minimal'] { --accent:#5E8570; --g2:#4A6B5A; --late:#9CC5AE; }
+html[data-mode='dark'] .toast { background: #F2EDF9; color: #201C2B; }
+.nav .status { margin-left: auto; }
+
+/* Portrait iPad: stack the columns and let the page scroll */
+@media (orientation: portrait) {
+  .app { padding: 16px 14px 10px; gap: 10px; }
+  .main { overflow-y: auto; }
+  .main > div { height: auto !important; min-height: 100%; }
+  .main > .keep { height: 100% !important; }
+  .cols { flex-direction: column !important; align-items: stretch !important; }
+  .cols.rev { flex-direction: column-reverse !important; }
+  .cols > * { width: auto !important; flex: none !important; }
+  .todo-card { height: 560px; }
+  .grow-min { min-height: 340px; }
+  .side { flex-direction: row !important; flex-wrap: wrap; }
+  .side > button { flex: none; }
+  .nav { overflow-x: auto; height: 60px; gap: 5px; }
+  .nav button { height: 48px; padding: 0 13px; font-size: 16px; }
+  .nav .status { display: none; }
+  .toast { width: calc(100vw - 32px); }
+}

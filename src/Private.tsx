@@ -1,3 +1,4 @@
+import { logError } from './lib/errorlog.ts'
 import { useEffect, useRef, useState } from 'react'
 import { daysUntil, lockRegister, lockRegistered, lockReset, lockSupported, lockUnlock, loadPrivate, money, monthsTo, savePrivate, type Kind, type PItem } from './lib/privateData.ts'
 
@@ -47,9 +48,9 @@ function Inside({ onLock }: { onLock: () => void }) {
   const [items, setItems] = useState<PItem[]>([])
   const [err, setErr] = useState('')
   const [edit, setEdit] = useState(false)
-  useEffect(() => { loadPrivate().then(setItems).catch(() => setErr('Could not load. Has 005_private.sql been run?')) }, [])
+  useEffect(() => { loadPrivate().then(setItems).catch(() => { logError('Goals: loading', 'Could not load. Has 005_private.sql been run?'); setErr('Could not load. Has 005_private.sql been run?') }) }, [])
   const of = (k: Kind) => items.filter(x => x.kind === k).sort((a, b) => a.sort - b.sort)
-  const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); savePrivate(next, { upsert: it }).catch(() => setErr('Could not save. Has 005_private.sql been run?')) }
+  const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); savePrivate(next, { upsert: it }).catch(() => { logError('Goals: saving', 'Could not save. Has 005_private.sql been run?'); setErr('Could not save. Has 005_private.sql been run?') }) }
   const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); savePrivate(next, { remove: id }).catch(() => setErr('Could not remove.')) }
   const add = (kind: Kind, f: Partial<PItem>) => { const l = of(kind); upsert({ id: `${kind}-${Date.now().toString(36)}`, kind, title: '', sub: '', cat: '', num1: 0, num2: 0, day: null, sort: (l[l.length - 1]?.sort ?? 0) + 1, ...f }) }
   return (

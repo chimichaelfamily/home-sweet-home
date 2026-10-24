@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, backupAll, lastBackup, markBackup, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
+import { clearErrors, getErrors, installGlobalHandlers, logError, markSeen, unseenCount } from './lib/errorlog.ts'
 import { embedUrl } from './lib/embed.ts'
 import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
@@ -31,6 +32,12 @@ export default function App() {
   const [toast, setToast] = useState<{ batch: string; title: string; who: Who; points: number; key: number } | null>(null)
   const stateRef = useRef<State | null>(null)
   stateRef.current = state
+  const [mode, setMode] = useState<'light' | 'dark' | 'auto'>(() => { try { return (localStorage.getItem('hsh.mode') as 'light' | 'dark' | 'auto') || 'light' } catch { return 'light' } })
+  const dark = useDark(mode)
+  useEffect(() => { document.documentElement.dataset.mode = dark ? 'dark' : 'light'; try { localStorage.setItem('hsh.mode', mode) } catch { /* ignore */ } }, [dark, mode])
+  const [errs, setErrs] = useState(unseenCount())
+  const [openErrors, setOpenErrors] = useState(false)
+  useEffect(() => { installGlobalHandlers(); const f = () => setErrs(unseenCount()); window.addEventListener('hsh-errors', f); return () => window.removeEventListener('hsh-errors', f) }, [])
 
   useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem('hsh.theme', theme) } catch { /* ignore */ } }, [theme])
 
@@ -41,7 +48,7 @@ export default function App() {
     return () => data.subscription.unsubscribe()
   }, [])
 
-  const refresh = useCallback(() => load().then(setState).catch(e => setError(String(e.message || e))), [])
+  const refresh = useCallback(() => load().then(setState).catch(e => { logError('Loading data', e); setError(String(e.message || e)) }), [])
   useEffect(() => { if (session) refresh() }, [session, refresh])
   // keep the door iPad fresh: reload data every few minutes, and the screen re-checks "today" each minute
   const [, tick] = useState(0)
@@ -51,7 +58,7 @@ export default function App() {
   const apply = useCallback(async (r: { state: State; ops: Op[]; batch?: string }) => {
     setState(r.state)
     const msg = await save(r.state, r.ops)
-    if (msg) setError('Could not save: ' + msg)
+    if (msg) { logError('Saving to the database', msg); setError('Could not save: ' + msg) }
     return r
   }, [])
 
@@ -75,18 +82,17 @@ export default function App() {
         {tab === 'habits' && <Habits s={state} apply={apply} />}
         {tab === 'morning' && <Morning />}
         {tab === 'private' && <Private />}
-        <div style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
+        <div className="keep" style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
         <div style={{ height: '100%', display: tab === 'weekly' ? 'block' : 'none' }}><Weekly s={state} /></div>
         {tab === 'reminders' && <Reminders s={state} apply={apply} onDone={setPending} />}
         {tab === 'points' && <Points s={state} apply={apply} />}
-        {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} />}
+        {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} mode={mode} setMode={setMode} openErrors={openErrors} clearOpen={() => setOpenErrors(false)} />}
       </div>
       <nav className="nav">
         {([['home', 'Home'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Morning'], ['reminders', 'Reminders'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
         ))}
-        <div style={{ flex: 1 }} />
-        <span className="muted" style={{ fontSize: 14 }}>{usingDatabase ? (backupDue() ? 'Backup due: Settings → Backup' : 'Saved to database') : 'Demo mode: saved on this iPad only'}</span>
+        {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenErrors(true) }}>Something went wrong: see Settings → Errors</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
       </nav>
       {adding && <AddTask onClose={() => setAdding(false)} onAdd={async (t, sz) => { setAdding(false); if (stateRef.current) await apply(A.addTask(stateRef.current, t, sz)) }} />}
       {pending && <WhoDid p={pending} onPick={w => doComplete(pending, w)} onClose={() => setPending(null)} />}
@@ -167,6 +173,23 @@ function PersonToggle({ who, setWho }: { who: 'linh' | 'michael'; setWho: (w: 'l
   )
 }
 
+/** Dark after sunset in Melbourne (falls back to 7pm to 6am if the sunset time cannot be fetched). */
+function useDark(mode: 'light' | 'dark' | 'auto'): boolean {
+  const [sun, setSun] = useState<{ rise: number; set: number } | null>(null)
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(t) }, [])
+  useEffect(() => {
+    if (mode !== 'auto') return
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=-37.81&longitude=144.96&daily=sunrise,sunset&timezone=Australia%2FMelbourne&forecast_days=1')
+      .then(r => r.json()).then(j => setSun({ rise: new Date(j.daily.sunrise[0]).getTime(), set: new Date(j.daily.sunset[0]).getTime() }))
+      .catch(() => setSun(null))
+  }, [mode, today()])
+  if (mode === 'dark') return true
+  if (mode === 'light') return false
+  if (sun) return now >= sun.set || now < sun.rise
+  const h = new Date(now).getHours(); return h >= 19 || h < 6
+}
+
 function backupDue(): boolean {
   const b = lastBackup(); if (!b) return false
   return diffDays(today(), b) > 35
@@ -240,8 +263,8 @@ function Home({ s, apply, onAdd, onTick, goReminders }: { s: State; apply: (r: {
   const doneCount = todayTasks.filter(x => x.done_at).length
   const personTag = (a: string | null) => a === 'linh' ? 'L' : a === 'michael' ? 'M' : null
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'row-reverse', gap: 20 }}>
-      <div className="card" style={{ width: 500, flex: 'none', padding: 28, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
+    <div className="cols rev" style={{ height: '100%', display: 'flex', flexDirection: 'row-reverse', gap: 20 }}>
+      <div className="card todo-card" style={{ width: 500, flex: 'none', padding: 28, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 30, fontWeight: 600 }}>To do</div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -325,7 +348,7 @@ function Schedule() {
         if (l.linh) all.push(...await fetchCalendar(l.linh, 'linh', days[0], days[days.length - 1]))
         if (l.michael) all.push(...await fetchCalendar(l.michael, 'michael', days[0], days[days.length - 1]))
         if (!off) { setEvents(all); setErr('') }
-      } catch { if (!off) setErr('Could not refresh the calendar. Showing the last update.') }
+      } catch (e) { logError('Calendar', e); if (!off) setErr('Could not refresh the calendar. Showing the last update.') }
     }
     go(); const id = setInterval(go, 10 * 60000)
     return () => { off = true; clearInterval(id) }
@@ -335,7 +358,7 @@ function Schedule() {
   const connected = links && (links.linh || links.michael)
   const tabHas = (k: 'linh' | 'michael') => !!links?.[k]
   return (
-    <div className="card" style={{ flex: 1, padding: '16px 24px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div className="card grow-min" style={{ flex: 1, padding: '16px 24px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ fontSize: 24, fontWeight: 600 }}>Schedule</div>
         <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
@@ -399,8 +422,8 @@ function Morning() {
   useEffect(() => { loadMorning().then(setItems).catch(() => setItems([])) }, [])
   const mine = (k: MItem['kind']) => items.filter(x => x.person_id === who && x.kind === k).sort((a, b) => a.sort - b.sort)
   const aff = mine('affirmation'), links = mine('link'), songs = mine('song')
-  const upsert = (it: MItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); saveMorning(next, { upsert: it }) }
-  const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); saveMorning(next, { remove: id }) }
+  const upsert = (it: MItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); saveMorning(next, { upsert: it }).catch(e => logError('Morning: saving', e)) }
+  const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); saveMorning(next, { remove: id }).catch(e => logError('Morning: saving', e)) }
   const add = (kind: MItem['kind'], title: string, sub = '', url = '') => {
     const list = mine(kind); upsert({ id: `${who}-${kind}-${Date.now().toString(36)}`, person_id: who, kind, title, sub, url, sort: (list[list.length - 1]?.sort ?? 0) + 1 })
   }
@@ -443,7 +466,7 @@ function Morning() {
         <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>
         <PersonToggle who={who} setWho={w => { setWho(w); setI(0) }} />
       </div>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 14 }}>
+      <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 14 }}>
         <div style={{ flex: 1.2, minWidth: 0, borderRadius: 28, padding: 28, display: 'flex', flexDirection: 'column', gap: 14, color: 'var(--on-accent)', background: 'linear-gradient(135deg,var(--accent),var(--g2))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}><span>1 · READ YOUR AFFIRMATIONS</span><span>{aff.length ? `${Math.min(i, aff.length - 1) + 1} of ${aff.length}` : ''}</span></div>
           {!edit && <>
@@ -617,10 +640,13 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
   )
 }
 
-function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'calendars' | 'products' | 'backup'>('look')
+function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearOpen }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void; mode: 'light' | 'dark' | 'auto'; setMode: (m: 'light' | 'dark' | 'auto') => void; openErrors: boolean; clearOpen: () => void }) {
+  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
+  const [errList, setErrList] = useState(getErrors())
+  useEffect(() => { if (openErrors) { setSec('errors'); clearOpen() } }, [openErrors, clearOpen])
+  useEffect(() => { if (sec === 'errors') markSeen(); const f = () => setErrList(getErrors()); window.addEventListener('hsh-errors', f); return () => window.removeEventListener('hsh-errors', f) }, [sec])
   const [sel, setSel] = useState<string | null>(null)
   const t = today()
   const rule = s.rules.find(r => r.id === sel) ?? null
@@ -637,9 +663,9 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
-        <div className="card" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['calendars', 'Calendars'], ['products', 'Products'], ['backup', 'Backup']] as const).map(([id, l]) => (
+      <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
+        <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['calendars', 'Calendars'], ['products', 'Products'], ['backup', 'Backup'], ['errors', 'Errors']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
@@ -647,6 +673,10 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
           {sec === 'look' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ fontSize: 30, fontWeight: 600 }}>Appearance</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 600, fontSize: 17 }}>Brightness</span>
+                {([['light', 'Light'], ['dark', 'Dark'], ['auto', 'Dark after sunset']] as const).map(([k, l]) => <button key={k} aria-pressed={mode === k} onClick={() => setMode(k)} style={{ height: 44, padding: '0 18px', borderRadius: 999, fontWeight: 600, fontSize: 16, border: '1.5px solid var(--mborder)', background: mode === k ? 'var(--accent)' : 'transparent', color: mode === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+              </div>
               <div style={{ display: 'flex', gap: 14 }}>
                 {THEMES.map(th => (
                   <button key={th.id} onClick={() => setTheme(th.id)} aria-pressed={theme === th.id} data-theme={th.id} style={{ flex: 1, borderRadius: 22, padding: 12, textAlign: 'left', background: 'var(--card)', border: theme === th.id ? '2.5px solid var(--accent)' : '1.5px solid var(--border)', color: 'var(--ink)' }}>
@@ -705,6 +735,19 @@ function Settings({ s, apply, theme, setTheme }: { s: State; apply: (r: { state:
                 <button className="btn small" type="submit">Add</button>
               </form>
               <div className="muted" style={{ fontSize: 14 }}>Removing a habit hides it. Its past days are kept.</div>
+            </div>
+          )}
+          {sec === 'errors' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ fontSize: 30, fontWeight: 600, flex: 1 }}>Errors</div>{errList.length > 0 && <button className="btn small outline" onClick={() => { clearErrors(); setErrList([]) }}>Clear</button>}</div>
+              {errList.length === 0 && <div className="muted" style={{ fontSize: 17 }}>No problems recorded. If something does not save or load, it will be listed here with the time.</div>}
+              {errList.map((e, i) => (
+                <div key={i} className="card" style={{ padding: '12px 18px' }}>
+                  <div style={{ fontWeight: 600 }}>{e.where}</div>
+                  <div className="muted" style={{ fontSize: 14 }}>{new Date(e.at).toLocaleString('en-AU')}</div>
+                  <div style={{ fontSize: 16, marginTop: 4, wordBreak: 'break-word' }}>{e.message}</div>
+                </div>
+              ))}
             </div>
           )}
           {sec === 'calendars' && <CalendarSettings />}

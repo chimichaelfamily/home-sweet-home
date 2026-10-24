@@ -4,6 +4,7 @@ import { PEOPLE } from './lib/types.ts'
 import { today, fmtShort, addDays } from './lib/dates.ts'
 import { mondayOf, weekly } from './lib/weekly.ts'
 import { supabase } from './lib/backend.ts'
+import { logError } from './lib/errorlog.ts'
 import { askAI } from './lib/ai.ts'
 import { loadPrivate, money, type PItem } from './lib/privateData.ts'
 
@@ -48,7 +49,7 @@ ${withGoals ? goalsText() : ''}`
   const write = async () => {
     setWriting(true); setMsg('')
     try { const a = await askAI([{ role: 'user', text: prompt() }]); setNote(a); setDraft(a); await saveNote(key, a); setMsg('Written and saved.') }
-    catch (e) { setMsg((e as Error).message) } finally { setWriting(false) }
+    catch (e) { logError('Report: writing', e); setMsg((e as Error).message) } finally { setWriting(false) }
   }
   const stat = (label: string, a: string, b: string) => (
     <div className="card" style={{ flex: 1, padding: '14px 18px' }}>

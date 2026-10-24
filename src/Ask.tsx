@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { State } from './lib/types.ts'
 import { status, daysLate } from './lib/rules.ts'
 import { today } from './lib/dates.ts'
+import { logError } from './lib/errorlog.ts'
 import { askAI, type Msg } from './lib/ai.ts'
 
 type SR = { start: () => void; stop: () => void; lang: string; interimResults: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null }
@@ -31,7 +32,7 @@ export function Ask({ s }: { s: State }) {
       const a = await askAI(next, context)
       setMsgs([...next, { role: 'model', text: a }])
       if (speak && 'speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(a); u.lang = 'en-AU'; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u) }
-    } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
+    } catch (e) { logError('AI chat', e); setErr((e as Error).message) } finally { setBusy(false) }
   }
   const mic = () => {
     if (!Rec) return

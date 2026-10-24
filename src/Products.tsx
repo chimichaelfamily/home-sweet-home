@@ -1,3 +1,4 @@
+import { logError } from './lib/errorlog.ts'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from './lib/backend.ts'
 import { today, fmtShort } from './lib/dates.ts'
@@ -28,13 +29,13 @@ export function Products() {
   const [form, setForm] = useState<null | { id?: string; name: string; type: string; place: string; opened: string; printed: string; months: string; note?: string }>(null)
   const [scanning, setScanning] = useState(false)
   const file = useRef<HTMLInputElement>(null)
-  useEffect(() => { load().then(setItems).catch(() => setErr('Could not load. Has 007_products.sql been run?')) }, [])
+  useEffect(() => { load().then(setItems).catch(() => { logError('Products: loading', 'Could not load. Has 007_products.sql been run?'); setErr('Could not load. Has 007_products.sql been run?') }) }, [])
 
   const save = (f: NonNullable<typeof form>) => {
     const months = Math.max(1, Number(f.months) || SHELF[f.type] || 12)
     const p: Product = { id: f.id ?? `prod-${Date.now().toString(36)}`, name: f.name.trim(), type: f.type, place: f.place, opened: f.opened, printed_expiry: f.printed || null, shelf_months: months, use_by: useBy(f.opened, months, f.printed || null), used_up: false }
     const next = items.some(x => x.id === p.id) ? items.map(x => x.id === p.id ? p : x) : [...items, p]
-    setItems(next); setForm(null); persist(next, { upsert: p }).catch(() => setErr('Could not save. Has 007_products.sql been run?'))
+    setItems(next); setForm(null); persist(next, { upsert: p }).catch(() => { logError('Products: saving', 'Could not save. Has 007_products.sql been run?'); setErr('Could not save. Has 007_products.sql been run?') })
   }
   const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); setForm(null); persist(next, { remove: id }).catch(() => setErr('Could not remove.')) }
   const blank = { name: '', type: 'Other', place: 'Kitchen', opened: t, printed: '', months: '' }
