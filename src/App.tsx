@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, backupAll, lastBackup, markBackup, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
+import { PhotoPicker } from './PhotoPicker.tsx'
+import { Face, FaceSettings, refreshAvatars } from './Face.tsx'
+import { WeatherScene } from './WeatherScene.tsx'
+import { skyOf } from './lib/photos.ts'
 import { clearErrors, getErrors, installGlobalHandlers, logError, markSeen, unseenCount } from './lib/errorlog.ts'
 import { embedUrl } from './lib/embed.ts'
 import { Weekly } from './Weekly.tsx'
@@ -49,7 +53,7 @@ export default function App() {
   }, [])
 
   const refresh = useCallback(() => load().then(setState).catch(e => { logError('Loading data', e); setError(String(e.message || e)) }), [])
-  useEffect(() => { if (session) refresh() }, [session, refresh])
+  useEffect(() => { if (session) { refresh(); refreshAvatars() } }, [session, refresh])
   // keep the door iPad fresh: reload data every few minutes, and the screen re-checks "today" each minute
   const [, tick] = useState(0)
   useEffect(() => { const t = setInterval(() => tick(n => n + 1), 60000); return () => clearInterval(t) }, [])
@@ -133,13 +137,13 @@ function overdueList(s: State) {
   return s.rules.filter(r => status(r, t) === 'overdue' && !snoozed.has(r.id)).sort((a, b) => daysLate(b, t) - daysLate(a, t))
 }
 
-type Wx = { temp: number; text: string; hi: number; lo: number } | null
+type Wx = { temp: number; text: string; hi: number; lo: number; code: number; day: boolean } | null
 function useWeather(): Wx {
   const [w, setW] = useState<Wx>(null)
   useEffect(() => {
     let off = false
-    const go = () => fetch('https://api.open-meteo.com/v1/forecast?latitude=-37.81&longitude=144.96&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Australia%2FMelbourne&forecast_days=1')
-      .then(r => r.json()).then(j => { if (!off) setW({ temp: Math.round(j.current.temperature_2m), text: weatherText(j.current.weather_code), hi: Math.round(j.daily.temperature_2m_max[0]), lo: Math.round(j.daily.temperature_2m_min[0]) }) })
+    const go = () => fetch('https://api.open-meteo.com/v1/forecast?latitude=-37.81&longitude=144.96&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=Australia%2FMelbourne&forecast_days=1')
+      .then(r => r.json()).then(j => { if (!off) setW({ code: j.current.weather_code, day: j.current.is_day === 1, temp: Math.round(j.current.temperature_2m), text: weatherText(j.current.weather_code), hi: Math.round(j.daily.temperature_2m_max[0]), lo: Math.round(j.daily.temperature_2m_min[0]) }) })
       .catch(() => { /* offline: keep the last reading */ })
     go(); const t = setInterval(go, 30 * 60000)
     return () => { off = true; clearInterval(t) }
@@ -262,8 +266,8 @@ function Home({ s, apply, onEdit, onAdd, onTick, goReminders }: { s: State; appl
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 30, fontWeight: 600 }}>To do</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <div className="pill" style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: 16, padding: '7px 14px' }}>Linh Chi <b style={{ fontSize: 20 }}>{totals.linh}</b></div>
-            <div className="pill" style={{ background: 'var(--blue-bg)', border: '1.5px solid var(--blue-bd)', color: 'var(--blue-tx)', fontSize: 16, padding: '7px 14px' }}>Michael <b style={{ fontSize: 20 }}>{totals.michael}</b></div>
+            <div className="pill" style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: 16, padding: '4px 14px 4px 5px', display: 'flex', alignItems: 'center', gap: 8 }}><Face who="linh" size={30} /><b style={{ fontSize: 22 }}>{totals.linh}</b></div>
+            <div className="pill" style={{ background: 'var(--blue-bg)', border: '1.5px solid var(--blue-bd)', color: 'var(--blue-tx)', fontSize: 16, padding: '4px 14px 4px 5px', display: 'flex', alignItems: 'center', gap: 8 }}><Face who="michael" size={30} /><b style={{ fontSize: 22 }}>{totals.michael}</b></div>
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }} className="muted">
@@ -304,7 +308,7 @@ function Home({ s, apply, onEdit, onAdd, onTick, goReminders }: { s: State; appl
         <button onClick={onAdd} style={{ marginTop: 8, height: 56, borderRadius: 16, border: '1.5px dashed var(--mborder)', background: 'transparent', fontSize: 19, fontWeight: 600 }}>+ Add task</button>
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{ height: 120, flex: 'none', borderRadius: 28, padding: '20px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--on-accent)', background: 'linear-gradient(120deg,var(--accent),var(--g2))' }}>
+        <WeatherScene sky={wx ? skyOf(wx.code) : null} day={wx ? wx.day : true} temp={wx ? wx.temp : null}>
           <div>
             <div style={{ fontSize: 56, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{now.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: false })}</div>
             <div style={{ fontSize: 18, opacity: .9 }}>{now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
@@ -315,7 +319,7 @@ function Home({ s, apply, onEdit, onAdd, onTick, goReminders }: { s: State; appl
               <div><div style={{ fontSize: 19, fontWeight: 600 }}>{wx.text}</div><div style={{ fontSize: 15, opacity: .9 }}>H {wx.hi}° · L {wx.lo}°</div><div style={{ fontSize: 15, opacity: .9 }}>Melbourne</div></div>
             </div>
           ) : <div style={{ fontSize: 16, opacity: .9 }}>Melbourne weather loading…</div>}
-        </div>
+        </WeatherScene>
         <Schedule />
         <div className="card" style={{ flex: 'none', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 24, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
@@ -413,6 +417,7 @@ function Morning() {
   const [i, setI] = useState(0)
   const [edit, setEdit] = useState(false)
   const [playing, setPlaying] = useState<string | null>(null)
+  const [picking, setPicking] = useState<string | null>(null)
   useEffect(() => { loadMorning().then(setItems).catch(() => setItems([])) }, [])
   const mine = (k: MItem['kind']) => items.filter(x => x.person_id === who && x.kind === k).sort((a, b) => a.sort - b.sort)
   const aff = mine('affirmation'), links = mine('link'), songs = mine('song')
@@ -454,6 +459,7 @@ function Morning() {
   }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {picking && (() => { const a = items.find(x => x.id === picking); return a ? <PhotoPicker onPick={img => { upsert({ ...a, img }); setPicking(null) }} onClose={() => setPicking(null)} /> : null })()}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Morning</div>
         <div style={{ flex: 1 }} />
@@ -461,7 +467,7 @@ function Morning() {
         <PersonToggle who={who} setWho={w => { setWho(w); setI(0) }} />
       </div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 14 }}>
-        <div style={{ flex: 1.2, minWidth: 0, borderRadius: 28, padding: 28, display: 'flex', flexDirection: 'column', gap: 14, color: 'var(--on-accent)', background: 'linear-gradient(135deg,var(--accent),var(--g2))' }}>
+        <div style={{ flex: 1.2, minWidth: 0, borderRadius: 28, padding: 28, display: 'flex', flexDirection: 'column', gap: 14, color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,.35)', background: cur?.img ? `linear-gradient(rgba(20,12,30,.35),rgba(20,12,30,.55)), center / cover url("${cur.img}")` : 'linear-gradient(135deg,var(--accent),var(--g2))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}><span>1 · READ YOUR AFFIRMATIONS</span><span>{aff.length ? `${Math.min(i, aff.length - 1) + 1} of ${aff.length}` : ''}</span></div>
           {!edit && <>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', fontSize: 36, fontWeight: 600, lineHeight: 1.2 }}>{cur ? cur.title : 'No affirmations yet. Tap Edit to add some.'}</div>
@@ -471,7 +477,7 @@ function Morning() {
               <button className="btn" style={{ flex: 1, background: '#fff', color: 'var(--ink)' }} onClick={() => setI(i + 1 >= aff.length ? 0 : i + 1)}>{i + 1 >= aff.length ? 'Start again' : 'Next'}</button>
             </div></>}
           {edit && <div className="scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {aff.map(a => <div key={a.id} style={{ display: 'flex', gap: 8 }}><input type="text" defaultValue={a.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.title) upsert({ ...a, title: v }) }} /><button className="btn small" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff' }} onClick={() => remove(a.id)}>Remove</button></div>)}
+            {aff.map(a => <div key={a.id} style={{ display: 'flex', gap: 8 }}><input type="text" defaultValue={a.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.title) upsert({ ...a, title: v }) }} /><button className="btn small" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff' }} onClick={() => setPicking(a.id)}>{a.img ? 'Photo ✓' : 'Photo'}</button><button className="btn small" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff' }} onClick={() => remove(a.id)}>Remove</button></div>)}
             <form onSubmit={e => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('new') as HTMLInputElement; if (f.value.trim()) { add('affirmation', f.value.trim()); f.value = '' } }} style={{ display: 'flex', gap: 8 }}><input name="new" type="text" placeholder="New affirmation" /><button className="btn small" type="submit" style={{ background: '#fff', color: 'var(--ink)' }}>Add</button></form>
           </div>}
         </div>
@@ -616,8 +622,8 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
     const note = lead === 'Level' ? 'Level' : lead === who ? `Leading by ${Math.abs(tot.linh - tot.michael)}` : `${Math.abs(tot.linh - tot.michael)} behind`
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, height: 84 }}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 600, background: me ? 'var(--accent)' : 'var(--blue-bg)', color: me ? 'var(--on-accent)' : 'var(--blue-tx)', border: me ? 'none' : '2px solid var(--blue-bd)' }}>{me ? 'L' : 'M'}</div>
-        <div style={{ width: 110, flex: 'none' }}><div style={{ fontSize: 22, fontWeight: 600 }}>{PEOPLE[who]}</div><div className="muted" style={{ fontSize: 15 }}>{note}</div></div>
+        <Face who={who} size={72} />
+        <div style={{ width: 110, flex: 'none' }}><div style={{ fontSize: 18, fontWeight: 600 }}>{note}</div></div>
         <div style={{ flex: 1, position: 'relative', height: 60 }}>
           <div style={{ position: 'absolute', left: 0, right: 0, top: 20, height: 26, borderRadius: 13, background: 'var(--ground)', border: '1px solid var(--border)' }} />
           <div style={{ position: 'absolute', left: 0, top: 20, height: 26, borderRadius: 13, width: `calc((100% - 64px) * ${frac} + 40px)`, background: me ? 'var(--accent)' : 'var(--blue-bd)' }} />
@@ -660,7 +666,7 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
 }
 
 function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearOpen }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void; mode: 'light' | 'dark' | 'auto'; setMode: (m: 'light' | 'dark' | 'auto') => void; openErrors: boolean; clearOpen: () => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
+  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'faces' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
   const [errList, setErrList] = useState(getErrors())
@@ -684,7 +690,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['calendars', 'Calendars'], ['products', 'Products'], ['backup', 'Backup'], ['errors', 'Errors']] as const).map(([id, l]) => (
+          {([['look', 'Appearance'], ['rules', `Rules and reminders (${s.rules.length})`], ['habits', 'Habits'], ['faces', 'Faces'], ['calendars', 'Calendars'], ['products', 'Products'], ['backup', 'Backup'], ['errors', 'Errors']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
@@ -769,6 +775,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
               ))}
             </div>
           )}
+          {sec === 'faces' && <FaceSettings />}
           {sec === 'calendars' && <CalendarSettings />}
           {sec === 'products' && <div style={{ height: '100%', minWidth: 0 }}><Products /></div>}
           {sec === 'backup' && (

@@ -86,7 +86,7 @@ export async function saveCalLink(person: 'linh' | 'michael', url: string, all: 
   try { localStorage.setItem(CAL_KEY, JSON.stringify({ ...all, [person]: url })) } catch { /* ignore */ }
 }
 
-export interface MItem { id: string; person_id: 'linh' | 'michael'; kind: 'affirmation' | 'link' | 'song'; title: string; sub: string; url: string; sort: number }
+export interface MItem { id: string; person_id: 'linh' | 'michael'; kind: 'affirmation' | 'link' | 'song'; title: string; sub: string; url: string; sort: number; img?: string }
 const M_KEY = 'home-sweet-home.morning.v1'
 export function seedMorning(): MItem[] {
   const t = ['I am building a life of freedom, and every small step counts.', 'I am calm, capable and ready for today.', 'I make time for the things that matter to me.', 'I am proud of how far I have come.', 'Good things are coming, and I am ready for them.']

@@ -1,3 +1,4 @@
+import { PhotoPicker } from './PhotoPicker.tsx'
 import { logError } from './lib/errorlog.ts'
 import { useEffect, useRef, useState } from 'react'
 import { daysUntil, lockRegister, lockRegistered, lockReset, lockSupported, lockUnlock, loadPrivate, money, monthsTo, savePrivate, type Kind, type PItem } from './lib/privateData.ts'
@@ -114,11 +115,12 @@ function Goals({ pillars, ladder, edit, add, upsert, remove }: { pillars: PItem[
 }
 
 const CATS = ['Love', 'Money', 'Travel', 'Health', 'Home', 'Career']
-function Vision({ counts, pins, edit, add, remove }: { counts: PItem[]; pins: PItem[] } & Ops) {
-  const [ct, setCt] = useState(''); const [cd, setCd] = useState(''); const [pt, setPt] = useState(''); const [pc, setPc] = useState(CATS[0]); const [f, setF] = useState('All')
+function Vision({ counts, pins, edit, add, upsert, remove }: { counts: PItem[]; pins: PItem[] } & Ops) {
+  const [ct, setCt] = useState(''); const [cd, setCd] = useState(''); const [pt, setPt] = useState(''); const [pc, setPc] = useState(CATS[0]); const [f, setF] = useState('All'); const [pick, setPick] = useState<string | null>(null)
   const cs = [...counts].filter(c => c.day).sort((a, b) => a.day!.localeCompare(b.day!))
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {pick && (() => { const pin = pins.find(x => x.id === pick); return pin ? <PhotoPicker initial={pin.title} onPick={img => { upsert({ ...pin, img }); setPick(null) }} onClose={() => setPick(null)} /> : null })()}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {cs.map((c, i) => { const n = daysUntil(c.day!); return (
           <div key={c.id} className="card" style={{ minWidth: 220, padding: '14px 20px', ...(i === 0 ? { background: 'var(--accent)', color: 'var(--on-accent)' } : {}) }}>
@@ -134,15 +136,15 @@ function Vision({ counts, pins, edit, add, remove }: { counts: PItem[]; pins: PI
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {pins.filter(p => f === 'All' || p.cat === f).map((p, i) => (
-          <div key={p.id} style={{ minHeight: 150, borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', color: '#fff', background: `linear-gradient(135deg, hsl(${(i * 47 + 280) % 360} 35% 55%), hsl(${(i * 47 + 330) % 360} 40% 42%))` }}>
+          <div key={p.id} style={{ minHeight: 150, borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.45)', background: p.img ? `linear-gradient(transparent 35%, rgba(0,0,0,.6)), center / cover url("${p.img}")` : `linear-gradient(135deg, hsl(${(i * 47 + 280) % 360} 35% 55%), hsl(${(i * 47 + 330) % 360} 40% 42%))` }}>
             <div style={{ fontSize: 12, fontWeight: 700, opacity: .85 }}>{p.cat.toUpperCase()}</div>
             <div style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.2 }}>{p.title}</div>
-            {edit && <div style={{ marginTop: 8 }}><RM onClick={() => remove(p.id)} /></div>}
+            {edit && <div style={{ marginTop: 8, display: 'flex', gap: 6 }}><button className="btn small outline" onClick={() => setPick(p.id)}>{p.img ? 'Change photo' : 'Add photo'}</button><RM onClick={() => remove(p.id)} /></div>}
           </div>
         ))}
       </div>
       {edit && <form style={{ display: 'flex', gap: 8, maxWidth: 640 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pin', { title: pt.trim(), cat: pc }); setPt('') } }}><input type="text" placeholder="New vision, e.g. A garden full of flowers" value={pt} onChange={e => setPt(e.target.value)} /><select aria-label="Category" value={pc} onChange={e => setPc(e.target.value)}>{CATS.map(c => <option key={c}>{c}</option>)}</select><button className="btn small" type="submit">Add</button></form>}
-      <div className="muted" style={{ fontSize: 13 }}>Photos on pins come later. For now each pin is a coloured card with your words.</div>
+      <div className="muted" style={{ fontSize: 13 }}>In Edit, tap Add photo on a card to search free photos or use one from your iPad.</div>
     </div>
   )
 }

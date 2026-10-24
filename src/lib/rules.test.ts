@@ -127,3 +127,10 @@ import { embedUrl } from './embed.ts'
   assert.ok(d.state.events.every(x => !!x.undone_at))
   console.log('task edit tests passed')
 }
+
+import { skyOf } from './photos.ts'
+{
+  assert.strictEqual(skyOf(0), 'clear'); assert.strictEqual(skyOf(61), 'rain'); assert.strictEqual(skyOf(95), 'storm')
+  assert.strictEqual(skyOf(73), 'snow'); assert.strictEqual(skyOf(3), 'cloudy'); assert.strictEqual(skyOf(45), 'fog')
+  console.log('sky tests passed')
+}
