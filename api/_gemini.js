@@ -45,6 +45,7 @@ export async function gemini({ system, contents, json }) {
     // 404 (model name not available) or 5xx: try the next model
   }
   const busy = last.status === 503 ? ' Google\'s AI is busy right now. Wait a minute and try again.' : ''
-  const hint = busy || last.status === 400 || last.status === 403 || last.status === 401 ? ' Check the key in Vercel: it must be a Gemini key from aistudio.google.com.' : ''
+  const keyHint = [400, 401, 403].includes(last.status) ? ' Check the key in Vercel: it must be a Gemini key from aistudio.google.com.' : ''
+  const hint = busy || keyHint
   throw Object.assign(new Error(`Gemini said ${last.status}: ${last.message || 'no details'}.${hint}`), { status: 502 })
 }
