@@ -92,3 +92,13 @@ import { mondayOf, weekly } from './weekly.ts'
   assert.strictEqual(w.people.linh.perfectDays, 3); assert.strictEqual(w.people.linh.bestStreak, 3)
   console.log('weekly tests passed')
 }
+
+import { productStatus, useBy } from './products.ts'
+{
+  assert.strictEqual(useBy('2026-10-24', 12, null), '2027-10-24')
+  assert.strictEqual(useBy('2026-10-24', 12, '2027-03-01'), '2027-03-01') // printed date earlier wins
+  assert.strictEqual(useBy('2026-10-24', 6, '2028-01-01'), '2027-04-24')
+  assert.strictEqual(productStatus('2026-10-02', '2026-10-25').tone, 'late')
+  assert.strictEqual(productStatus('2026-11-10', '2026-10-25').label, 'In 16 days')
+  console.log('product tests passed')
+}

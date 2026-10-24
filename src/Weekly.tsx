@@ -4,6 +4,7 @@ import { PEOPLE } from './lib/types.ts'
 import { today, fmtShort, addDays } from './lib/dates.ts'
 import { mondayOf, weekly } from './lib/weekly.ts'
 import { supabase } from './lib/backend.ts'
+import { askAI } from './lib/ai.ts'
 import { loadPrivate, money, type PItem } from './lib/privateData.ts'
 
 const KEY = 'home-sweet-home.weekly.v1'
@@ -43,6 +44,12 @@ Points: Linh Chi ${L.points} (${L.tasks} tasks), Michael ${M.points} (${M.tasks}
 Habits: Linh Chi ${L.habitPct}% done, ${L.perfectDays} perfect days, best streak ${L.bestStreak}; Michael ${M.habitPct}% done, ${M.perfectDays} perfect days, best streak ${M.bestStreak}.
 Open tasks: ${w.open.join('; ') || 'none'}. Overdue reminders: ${w.overdue.join('; ') || 'none'}. Coming up next 7 days: ${w.comingUp.map(c => `${c.name} (${fmtShort(c.due)})`).join('; ') || 'nothing'}.
 ${withGoals ? goalsText() : ''}`
+  const [writing, setWriting] = useState(false)
+  const write = async () => {
+    setWriting(true); setMsg('')
+    try { const a = await askAI([{ role: 'user', text: prompt() }]); setNote(a); setDraft(a); await saveNote(key, a); setMsg('Written and saved.') }
+    catch (e) { setMsg((e as Error).message) } finally { setWriting(false) }
+  }
   const stat = (label: string, a: string, b: string) => (
     <div className="card" style={{ flex: 1, padding: '14px 18px' }}>
       <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>{label}</div>
@@ -78,13 +85,13 @@ ${withGoals ? goalsText() : ''}`
           </div>
         </div>
         <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>Claude's note</div>
-          {!editing && (note ? <div style={{ fontSize: 17, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{note}</div> : <div className="muted" style={{ fontSize: 15 }}>No note yet. Tap "Get Claude's thoughts", then paste the reply here.</div>)}
-          {editing && <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={8} placeholder="Paste Claude's reply here" style={{ width: '100%', fontSize: 17, borderRadius: 16, border: '2px solid var(--border)', padding: 14, fontFamily: 'inherit' }} />}
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 15 }}><input type="checkbox" checked={withGoals} onChange={e => setWithGoals(e.target.checked)} style={{ width: 22, height: 22 }} />Also send my goals and money progress to Claude</label>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>This week's note</div>
+          {!editing && (note ? <div style={{ fontSize: 17, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{note}</div> : <div className="muted" style={{ fontSize: 15 }}>No note yet. Tap "Write this week's newsletter" and Gemini will write it.</div>)}
+          {editing && <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={8} placeholder="Write or paste your note" style={{ width: '100%', fontSize: 17, borderRadius: 16, border: '2px solid var(--border)', padding: 14, fontFamily: 'inherit' }} />}
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 15 }}><input type="checkbox" checked={withGoals} onChange={e => setWithGoals(e.target.checked)} style={{ width: 22, height: 22 }} />Also include my goals and money progress (sent to Gemini, Google's AI)</label>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn small" onClick={() => window.open('https://claude.ai/new?q=' + encodeURIComponent(prompt()), '_blank')}>Get Claude's thoughts</button>
-            {!editing && <button className="btn small outline" onClick={() => setEditing(true)}>{note ? 'Edit note' : 'Paste reply'}</button>}
+            <button className="btn small" disabled={writing} onClick={write}>{writing ? 'Writing…' : note ? 'Write it again' : 'Write this week\'s newsletter'}</button>
+            {!editing && <button className="btn small outline" onClick={() => setEditing(true)}>{note ? 'Edit note' : 'Write my own'}</button>}
             {editing && <button className="btn small" onClick={async () => { await saveNote(key, draft.trim()); setNote(draft.trim()); setEditing(false); setMsg('Saved.') }}>Save note</button>}
             {editing && <button className="btn small outline" onClick={() => { setDraft(note); setEditing(false) }}>Cancel</button>}
           </div>
