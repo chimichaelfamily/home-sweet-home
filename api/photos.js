@@ -17,6 +17,6 @@ export default async function handler(req, res) {
     if (r.status === 403 || r.status === 429) { res.status(429).json({ error: 'Photo search limit reached for now. Try again in an hour.' }); return }
     if (!r.ok) { res.status(502).json({ error: 'Photo search failed (' + r.status + ').' }); return }
     const j = await r.json()
-    res.status(200).json({ photos: (j.results || []).map(p => ({ id: p.id, thumb: p.urls.small, full: p.urls.regular, by: p.user?.name || '', link: p.links?.html || '', dl: p.links?.download_location || '' })) })
+    res.status(200).json({ photos: (j.results || []).map(p => ({ id: p.id, thumb: p.urls.small, full: p.urls.regular, by: p.user?.name || '', link: (p.user?.links?.html ? p.user.links.html + '?utm_source=home_hub&utm_medium=referral' : ''), dl: p.links?.download_location || '' })) })
   } catch { res.status(500).json({ error: 'Photo search failed.' }) }
 }

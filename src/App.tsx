@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, backupAll, lastBackup, markBackup, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
-import { PhotoPicker } from './PhotoPicker.tsx'
+import { Credit, PhotoPicker } from './PhotoPicker.tsx'
 import { Face, FaceSettings, refreshAvatars } from './Face.tsx'
 import { WeatherScene } from './WeatherScene.tsx'
 import { skyOf } from './lib/photos.ts'
@@ -459,7 +459,7 @@ function Morning() {
   }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {picking && (() => { const a = items.find(x => x.id === picking); return a ? <PhotoPicker onPick={img => { upsert({ ...a, img }); setPicking(null) }} onClose={() => setPicking(null)} /> : null })()}
+      {picking && (() => { const a = items.find(x => x.id === picking); return a ? <PhotoPicker onPick={(img, credit) => { upsert({ ...a, img, sub: img && credit ? credit : '' }); setPicking(null) }} onClose={() => setPicking(null)} /> : null })()}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Morning</div>
         <div style={{ flex: 1 }} />
@@ -471,6 +471,7 @@ function Morning() {
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}><span>1 · READ YOUR AFFIRMATIONS</span><span>{aff.length ? `${Math.min(i, aff.length - 1) + 1} of ${aff.length}` : ''}</span></div>
           {!edit && <>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', fontSize: 36, fontWeight: 600, lineHeight: 1.2 }}>{cur ? cur.title : 'No affirmations yet. Tap Edit to add some.'}</div>
+            {cur?.img && <Credit credit={cur.sub} />}
             <div style={{ display: 'flex', gap: 8 }}>{aff.map((_, k) => <div key={k} style={{ flex: 1, height: 6, borderRadius: 6, background: k <= i ? '#fff' : 'rgba(255,255,255,.35)' }} />)}</div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn" style={{ background: 'transparent', border: '1.5px solid #fff', color: '#fff', opacity: i === 0 ? .5 : 1 }} disabled={i === 0} onClick={() => setI(i - 1)}>Back</button>

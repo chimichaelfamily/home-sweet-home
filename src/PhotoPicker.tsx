@@ -10,7 +10,7 @@ async function headers(): Promise<Record<string, string>> {
   return data.session ? { Authorization: 'Bearer ' + data.session.access_token } : {}
 }
 
-export function PhotoPicker({ initial = '', onPick, onClose }: { initial?: string; onPick: (img: string) => void; onClose: () => void }) {
+export function PhotoPicker({ initial = '', onPick, onClose }: { initial?: string; onPick: (img: string, credit?: string) => void; onClose: () => void }) {
   const [q, setQ] = useState(initial)
   const [res, setRes] = useState<P[]>([])
   const [busy, setBusy] = useState(false)
@@ -27,7 +27,7 @@ export function PhotoPicker({ initial = '', onPick, onClose }: { initial?: strin
   }
   const choose = async (p: P) => {
     fetch('/api/photos?track=' + encodeURIComponent(p.dl), { headers: await headers() }).catch(() => { /* credit ping only */ })
-    onPick(p.full)
+    onPick(p.full, `${p.by}|${p.link}`)
   }
   return (
     <div className="overlay" onClick={onClose}><div className="dialog" style={{ width: 760, maxHeight: '92vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -47,4 +47,11 @@ export function PhotoPicker({ initial = '', onPick, onClose }: { initial?: strin
       </div>
     </div></div>
   )
+}
+
+/** Small photographer credit for Unsplash photos (credit string is "name|link"). */
+export function Credit({ credit }: { credit?: string }) {
+  if (!credit || !credit.includes('|')) return null
+  const [by, link] = credit.split('|')
+  return <div style={{ fontSize: 11, opacity: .85 }}>Photo by {link ? <a href={link} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{by}</a> : by} on <a href="https://unsplash.com/?utm_source=home_hub&utm_medium=referral" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>Unsplash</a></div>
 }
