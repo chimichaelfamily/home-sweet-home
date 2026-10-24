@@ -30,20 +30,22 @@ export async function gemini({ system, contents, json }) {
   if (system) body.systemInstruction = { parts: [{ text: system }] }
   if (json) body.generationConfig = { responseMimeType: 'application/json' }
   let last = null
+  const seen = new Set()
   for (const model of modelList()) {
     let r = await callGemini(model, body)
-    if (r.status === 503 || r.status === 500) { await new Promise(ok => setTimeout(ok, 1500)); r = await callGemini(model, body) } // Google is briefly busy: retry once
+    for (let n = 0; n < 2 && (r.status === 503 || r.status === 500); n++) { await new Promise(ok => setTimeout(ok, 2500)); r = await callGemini(model, body) } // Google is briefly busy: retry
     if (r.status === 200) {
       const text = (r.json.candidates?.[0]?.content?.parts ?? []).map(p => p.text ?? '').join('').trim()
       if (!text) throw Object.assign(new Error('The AI gave an empty answer (it may have blocked the request). Try rephrasing.'), { status: 502 })
       return text
     }
-    last = r
-    if (r.status === 429) throw Object.assign(new Error('The free AI limit was reached for now. Try again in a little while.'), { status: 429 })
+    if (!last || r.status !== 404) last = r
+    seen.add(r.status)
     if (r.status === 400 && /API key/i.test(r.message)) break
     if (r.status === 403 || r.status === 401) break
     // 404 (model name not available) or 5xx: try the next model
   }
+  if (seen.has(429) && !seen.has(503)) throw Object.assign(new Error('The free AI limit (quota) is used up for now. Try again later, or check your limits at aistudio.google.com.'), { status: 429 })
   const busy = last.status === 503 ? ' Google\'s AI is busy right now. Wait a minute and try again.' : ''
   const keyHint = [400, 401, 403].includes(last.status) ? ' Check the key in Vercel: it must be a Gemini key from aistudio.google.com.' : ''
   const hint = busy || keyHint
