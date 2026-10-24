@@ -80,3 +80,15 @@ import { daysUntil, monthsTo } from './pmath.ts'
   assert.strictEqual(daysUntil('2026-12-25', new Date(2026, 9, 25)), 61)
   console.log('private tests passed')
 }
+
+import { mondayOf, weekly } from './weekly.ts'
+{
+  assert.strictEqual(mondayOf('2026-10-25'), '2026-10-19') // Sunday -> previous Monday
+  assert.strictEqual(mondayOf('2026-10-26'), '2026-10-26')
+  const st = { rules: [], tasks: [], snoozes: [], habits: [{ id: 'h1', person_id: 'linh' as const, name: 'x', sort: 1, active: true }], habitLogs: ['2026-10-23', '2026-10-24', '2026-10-25'].map(day => ({ habit_id: 'h1', day })),
+    events: [{ id: 'e', person_id: 'michael' as const, points: 3, title: 't', category: null, size: 'biggie' as const, shared: false, task_id: null, rule_id: null, batch: 'b', prev_last_done: null, created_at: '2026-10-24T01:00:00Z', undone_at: null }] }
+  const w = weekly(st as never, '2026-10-25')
+  assert.strictEqual(w.people.michael.points, 3); assert.strictEqual(w.leader, 'michael')
+  assert.strictEqual(w.people.linh.perfectDays, 3); assert.strictEqual(w.people.linh.bestStreak, 3)
+  console.log('weekly tests passed')
+}

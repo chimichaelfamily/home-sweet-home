@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
+import { Weekly } from './Weekly.tsx'
 import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
 import { addMonthKey, daysInMonth, longestInMonth, monthLabel, streak, weatherText } from './lib/habits.ts'
 import * as A from './lib/actions.ts'
@@ -9,7 +10,7 @@ import { addDays, diffDays, dowShort, fmtLong, fmtShort, isoToYmd, today } from 
 import { daysLate, headsUps, nextDue, status, type Rule, type Unit } from './lib/rules.ts'
 import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Who } from './lib/types.ts'
 
-type Tab = 'home' | 'habits' | 'morning' | 'private' | 'ask' | 'reminders' | 'points' | 'settings'
+type Tab = 'home' | 'habits' | 'morning' | 'private' | 'ask' | 'weekly' | 'reminders' | 'points' | 'settings'
 type Pending = { kind: 'task' | 'rule'; id: string; title: string; size: Size } | null
 const THEMES = [
   { id: 'lilac', name: 'Lilac haze', note: 'Lavender, dusty pink' },
@@ -73,12 +74,13 @@ export default function App() {
         {tab === 'morning' && <Morning />}
         {tab === 'private' && <Private />}
         {tab === 'ask' && <Ask s={state} />}
+        {tab === 'weekly' && <Weekly s={state} />}
         {tab === 'reminders' && <Reminders s={state} apply={apply} onDone={setPending} />}
         {tab === 'points' && <Points s={state} apply={apply} />}
         {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['habits', 'Habits'], ['morning', 'Morning'], ['private', 'Private'], ['ask', 'Ask Claude'], ['reminders', 'Reminders'], ['points', 'Points'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+        {([['home', 'Home'], ['habits', 'Habits'], ['morning', 'Morning'], ['private', 'Private'], ['weekly', 'Weekly'], ['ask', 'Ask'], ['reminders', 'Reminders'], ['points', 'Points'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
         ))}
         <div style={{ flex: 1 }} />
