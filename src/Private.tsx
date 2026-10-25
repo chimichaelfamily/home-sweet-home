@@ -174,7 +174,14 @@ function Money({ rows, edit, add, upsert, remove }: { rows: PItem[] } & Ops) {
                 </div>
                 <div style={{ height: 12, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 12, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
                 <div className="muted" style={{ fontSize: 14 }}>{left > 0 ? `${money(per)} a month until Dec ${yr}` : 'Reached!'}</div>
-                {edit && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><label className="muted" style={{ fontSize: 13 }}>Saved so far</label><input type="number" aria-label="Saved so far" defaultValue={r.num1} onBlur={e => upsert({ ...r, num1: Number(e.target.value) || 0 })} style={{ width: 140 }} /><RM onClick={() => remove(r.id)} /></div>}
+                {edit && (
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 4 }}>
+                    <label style={{ flex: '2 1 180px' }}>Goal name<input type="text" defaultValue={r.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== r.title) upsert({ ...r, title: v }) }} style={{ width: '100%' }} /></label>
+                    <label style={{ width: 130 }}>Target $<input type="number" defaultValue={r.num2} onBlur={e => { const v = Number(e.target.value); if (v > 0 && v !== r.num2) upsert({ ...r, num2: v }) }} style={{ width: '100%' }} /></label>
+                    <label style={{ width: 130 }}>Saved so far $<input type="number" aria-label="Saved so far" defaultValue={r.num1} onBlur={e => upsert({ ...r, num1: Number(e.target.value) || 0 })} style={{ width: '100%' }} /></label>
+                    <label style={{ width: 110 }}>By Dec<input type="number" aria-label="By year" defaultValue={Number(r.cat)} onBlur={e => { const v = Math.round(Number(e.target.value)); if (v >= new Date().getFullYear() && v < 2100 && String(v) !== r.cat) upsert({ ...r, cat: String(v) }) }} style={{ width: '100%' }} /></label>
+                    <RM onClick={() => remove(r.id)} />
+                  </div>)}
               </div>
             )
           })}
