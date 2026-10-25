@@ -35,7 +35,10 @@ jobs:
           URL: ${{ secrets.SUPABASE_URL }}
           KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          base="${URL%/}"; base="${base%/rest/v1}"
+          base="$(echo "$URL" | tr -d '[:space:]')"; base="${base%/}"; base="${base%/rest/v1}"
+          case "$base" in https://*.supabase.co) ;; *) echo "::warning::SUPABASE_URL should look like https://xxxx.supabase.co (it does not)";; esac
+          KEY="$(echo "$KEY" | tr -d '[:space:]')"
+          case "$KEY" in sb_secret_*) echo "::notice::Using a new-style secret key";; eyJ*) echo "::notice::Using a legacy service_role key";; sb_publishable_*) echo "::warning::That is the publishable key, not the secret/service_role key";; *) echo "::warning::SUPABASE_SERVICE_KEY does not look like a Supabase key";; esac
           day=$(TZ=Australia/Melbourne date +%F)
           mkdir -p weekly
           out="weekly/backup-$day.json"
@@ -45,7 +48,7 @@ jobs:
             code=$(curl -s -o body.json -w "%{http_code}" "$base/rest/v1/$t?select=*" -H "apikey: $KEY")
             if [ "$code" = "401" ]; then code=$(curl -s -o body.json -w "%{http_code}" "$base/rest/v1/$t?select=*" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"); fi
             if [ "$code" = "200" ]; then printf ', "%s": ' "$t" >> "$out"; cat body.json >> "$out"; ok=$((ok+1)); echo "$t: ok"
-            else echo "$t: failed with HTTP $code $(head -c 200 body.json)"; bad=$((bad+1)); fi
+            else echo "::warning::$t failed with HTTP $code $(head -c 160 body.json | tr -d '\n\r')"; bad=$((bad+1)); fi
           done
           echo "}" >> "$out"
           rm -f body.json
