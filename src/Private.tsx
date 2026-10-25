@@ -283,7 +283,7 @@ function Money({ rows, step, upsertMany, edit, add, upsert, remove }: { rows: PI
                     <label style={{ width: 130 }}>Target $<input type="number" defaultValue={r.num2} onBlur={e => { const v = Number(e.target.value); if (v > 0 && v !== r.num2) upsert({ ...r, num2: v }) }} style={{ width: '100%' }} /></label>
                     <label style={{ width: 130 }}>Saved so far $<input type="number" aria-label="Saved so far" defaultValue={r.num1} onBlur={e => upsert({ ...r, num1: Number(e.target.value) || 0 })} style={{ width: '100%' }} /></label>
                     <label style={{ width: 110 }}>By Dec<input type="number" aria-label="By year" defaultValue={Number(r.cat)} onBlur={e => { const v = Math.round(Number(e.target.value)); if (v >= new Date().getFullYear() && v < 2100 && String(v) !== r.cat) upsert({ ...r, cat: String(v) }) }} style={{ width: '100%' }} /></label>
-                    <RM onClick={() => remove(r.id)} />
+                    <button className="btn small outline" aria-label={`Delete ${r.title}`} onClick={() => { if (confirm(`Delete "${r.title}"?`)) remove(r.id) }} style={{ width: 44, height: 44, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end', marginBottom: 6 }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg></button>
                   </div>)}
               </div>
             )
