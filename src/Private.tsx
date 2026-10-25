@@ -119,7 +119,7 @@ function Goals({ pillars, anchors, addMany, steps, tasks, onPush, edit, add, ups
           </>
         )}
       </div>
-      {pillars.length === 0 && <div className="card muted" style={{ padding: 22 }}>Add a big goal below, like "Vietnam trip". Then break it into steps and choose which ones go on your To do list.</div>}
+      {pillars.length === 0 && <div className="card muted" style={{ padding: 22 }}>Tap Edit to add a big goal, like "Vietnam trip". Then break it into steps and choose which ones go on your To do list.</div>}
       {pillars.map(p => {
         const mine = steps.filter(x => x.cat === p.id).sort((a, b) => a.sort - b.sort)
         const done = mine.filter(isDone).length
@@ -157,9 +157,9 @@ function Goals({ pillars, anchors, addMany, steps, tasks, onPush, edit, add, ups
           </div>
         )
       })}
-      <form className="card" style={{ display: 'flex', gap: 8, padding: 16 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pillar', { title: pt.trim() }); setPt('') } }}>
+      {edit && <form className="card" style={{ display: 'flex', gap: 8, padding: 16 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pillar', { title: pt.trim() }); setPt('') } }}>
         <input type="text" placeholder="New big goal, e.g. Vietnam trip" value={pt} onChange={e => setPt(e.target.value)} style={{ flex: 1, minWidth: 0 }} /><button className="btn small" type="submit">Add goal</button>
-      </form>
+      </form>}
     </div>
   )
 }
