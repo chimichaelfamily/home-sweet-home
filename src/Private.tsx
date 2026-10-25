@@ -53,6 +53,12 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
   useEffect(() => { loadPrivate().then(setItems).catch(() => { logError('Goals: loading', 'Could not load. Has 005_private.sql been run?'); setErr('Could not load. Has 005_private.sql been run?') }) }, [])
   const of = (k: Kind) => items.filter(x => x.kind === k).sort((a, b) => a.sort - b.sort)
   const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); savePrivate(next, { upsert: it }).catch(() => { logError('Goals: saving', 'Could not save. Have 005_private.sql and 011_goal_steps.sql been run?'); setErr('Could not save. Have 005_private.sql and 011_goal_steps.sql been run?') }) }
+  const addMany = (kind: Kind, base: Partial<PItem>, titles: string[]) => {
+    const l = of(kind); let sort = l[l.length - 1]?.sort ?? 0
+    const made: PItem[] = titles.map((title, i) => ({ id: `${kind}-${Date.now().toString(36)}-${i}`, kind, title, sub: '', cat: '', num1: 0, num2: 0, day: null, sort: ++sort, ...base }))
+    const next = [...items, ...made]; setItems(next)
+    made.reduce((p, it) => p.then(() => savePrivate(next, { upsert: it })), Promise.resolve()).catch(() => setErr('Could not save.'))
+  }
   const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); savePrivate(next, { remove: id }).catch(() => setErr('Could not remove.')) }
   const add = (kind: Kind, f: Partial<PItem>) => { const l = of(kind); upsert({ id: `${kind}-${Date.now().toString(36)}`, kind, title: '', sub: '', cat: '', num1: 0, num2: 0, day: null, sort: (l[l.length - 1]?.sort ?? 0) + 1, ...f }) }
   return (
@@ -68,7 +74,7 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
       </div>
       {err && <div style={{ fontSize: 14 }}>{err}</div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
-        {sub === 'goals' && <Goals pillars={of('pillar')} ladder={of('ladder')} steps={of('step')} tasks={tasks} onPush={onPush} edit={edit} add={add} upsert={upsert} remove={remove} />}
+        {sub === 'goals' && <Goals pillars={of('pillar')} anchors={of('ladder').filter(x => x.cat === ANCHOR)} addMany={addMany} steps={of('step')} tasks={tasks} onPush={onPush} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'vision' && <Vision counts={of('countdown')} pins={of('pin')} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'money' && <Money rows={of('money')} edit={edit} add={add} upsert={upsert} remove={remove} />}
       </div>
@@ -78,18 +84,41 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
 
 interface Ops { edit: boolean; add: (k: Kind, f: Partial<PItem>) => void; upsert: (i: PItem) => void; remove: (id: string) => void }
 const RM = ({ onClick }: { onClick: () => void }) => <button className="btn small outline" onClick={onClick}>Remove</button>
-const WHENS = ['10 YEARS', 'THIS YEAR', 'THIS QUARTER', 'THIS MONTH', 'THIS WEEK']
+const ANCHOR = 'ANCHOR' // stored as a 'ladder' row so no database change is needed
 
-function Goals({ pillars, ladder, steps, tasks, onPush, edit, add, upsert, remove }: { pillars: PItem[]; ladder: PItem[]; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string } & Ops) {
+function Goals({ pillars, anchors, addMany, steps, tasks, onPush, edit, add, upsert, remove }: { pillars: PItem[]; anchors: PItem[]; addMany: (kind: Kind, base: Partial<PItem>, titles: string[]) => void; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string } & Ops) {
   const [pt, setPt] = useState('')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [openTl, setOpenTl] = useState(false)
-  const sortedLadder = [...ladder].sort((a, b) => WHENS.indexOf(a.cat) - WHENS.indexOf(b.cat))
+  const [paste, setPaste] = useState('')
+  const [an, setAn] = useState('')
   const taskOf = (st: PItem) => (st.sub.startsWith('task:') ? tasks.find(t => t.id === st.sub.slice(5)) : undefined)
   const isDone = (st: PItem) => st.num1 === 1 || !!taskOf(st)?.done_at
   const inTodo = (st: PItem) => { const t = taskOf(st); return !!t && !t.done_at }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 22, fontWeight: 600 }}>Our anchors</div>
+        <div className="muted" style={{ fontSize: 14 }}>What we are building towards. Read these when you need to keep going.</div>
+        {anchors.map(a => (
+          <div key={a.id} className="row" style={{ minHeight: 46 }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style={{ flex: 'none' }}><path d="M6 0l6 6-6 6-6-6z" fill="var(--accent)" /></svg>
+            {edit ? <input type="text" aria-label="Anchor" defaultValue={a.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.title) upsert({ ...a, title: v }) }} style={{ flex: 1, minWidth: 0 }} />
+              : <div style={{ flex: 1, fontSize: 19, fontWeight: 500 }}>{a.title}</div>}
+            {edit && <RM onClick={() => remove(a.id)} />}
+          </div>
+        ))}
+        {(edit || anchors.length === 0) && (
+          <>
+            <form style={{ display: 'flex', gap: 8 }} onSubmit={e => { e.preventDefault(); if (an.trim()) { add('ladder', { title: an.trim(), cat: ANCHOR, sub: '' }); setAn('') } }}>
+              <input type="text" placeholder="Add an anchor" value={an} onChange={e => setAn(e.target.value)} style={{ flex: 1, minWidth: 0 }} /><button className="btn small" type="submit">Add</button>
+            </form>
+            <form style={{ display: 'flex', flexDirection: 'column', gap: 8 }} onSubmit={e => { e.preventDefault(); const lines = paste.split('\n').map(x => x.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean); if (lines.length) { addMany('ladder', { cat: ANCHOR }, lines); setPaste('') } }}>
+              <textarea rows={4} placeholder="Or paste a whole list, one anchor per line" value={paste} onChange={e => setPaste(e.target.value)} style={{ width: '100%', borderRadius: 16, border: '2px solid var(--border)', padding: 12, fontSize: 16, fontFamily: 'inherit', background: 'var(--card)', color: 'var(--ink)' }} />
+              <div><button className="btn small outline" type="submit" disabled={!paste.trim()}>Add all of these</button></div>
+            </form>
+          </>
+        )}
+      </div>
       {pillars.length === 0 && <div className="card muted" style={{ padding: 22 }}>Add a big goal below, like "Vietnam trip". Then break it into steps and choose which ones go on your To do list.</div>}
       {pillars.map(p => {
         const mine = steps.filter(x => x.cat === p.id).sort((a, b) => a.sort - b.sort)
@@ -131,19 +160,6 @@ function Goals({ pillars, ladder, steps, tasks, onPush, edit, add, upsert, remov
       <form className="card" style={{ display: 'flex', gap: 8, padding: 16 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pillar', { title: pt.trim() }); setPt('') } }}>
         <input type="text" placeholder="New big goal, e.g. Vietnam trip" value={pt} onChange={e => setPt(e.target.value)} style={{ flex: 1, minWidth: 0 }} /><button className="btn small" type="submit">Add goal</button>
       </form>
-      {sortedLadder.length > 0 && (
-        <div className="card" style={{ padding: '14px 22px' }}>
-          <button onClick={() => setOpenTl(!openTl)} style={{ background: 'none', border: 'none', fontSize: 17, fontWeight: 600, padding: 0 }}>{openTl ? '▾' : '▸'} Old timeline ({sortedLadder.length})</button>
-          {openTl && sortedLadder.map(l => (
-            <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 50, borderBottom: '1px solid var(--border)' }}>
-              <div className="muted" style={{ width: 110, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>{l.cat}</div>
-              <div style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{l.title}</div>
-              <span className="muted" style={{ fontSize: 13 }}>{l.sub || 'Next'}</span>
-              {edit && <RM onClick={() => remove(l.id)} />}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
