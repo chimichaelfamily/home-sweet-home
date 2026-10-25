@@ -286,8 +286,8 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 30, fontWeight: 600 }}>To do</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <div className="pill" style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: 16, padding: '4px 14px 4px 5px', display: 'flex', alignItems: 'center', gap: 8 }}><Face who="linh" size={30} /><b style={{ fontSize: 22 }}>{totals.linh}</b></div>
-            <div className="pill" style={{ background: 'var(--blue-bg)', border: '1.5px solid var(--blue-bd)', color: 'var(--blue-tx)', fontSize: 16, padding: '4px 14px 4px 5px', display: 'flex', alignItems: 'center', gap: 8 }}><Face who="michael" size={30} /><b style={{ fontSize: 22 }}>{totals.michael}</b></div>
+            <div className="pill" style={{ background: 'var(--ground)', border: '1.5px solid var(--border)', color: 'var(--ink)', fontSize: 16, padding: '4px 14px 4px 5px', display: 'flex', alignItems: 'center', gap: 8 }}><Face who="linh" size={30} /><b style={{ fontSize: 22 }}>{totals.linh}</b></div>
+            <div className="pill" style={{ background: 'var(--ground)', border: '1.5px solid var(--border)', color: 'var(--ink)', fontSize: 16, padding: '4px 14px 4px 5px', display: 'flex', alignItems: 'center', gap: 8 }}><Face who="michael" size={30} /><b style={{ fontSize: 22 }}>{totals.michael}</b></div>
           </div>
         </div>
         <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
