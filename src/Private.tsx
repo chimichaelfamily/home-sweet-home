@@ -56,6 +56,11 @@ function Inside({ onLock, tasks, onPush, demo = false }: { onLock: () => void; t
   useEffect(() => { if (demo) return; loadPrivate().then(setItems).catch(() => { logError('Goals: loading', 'Could not load. Has 005_private.sql been run?'); setErr('Could not load. Has 005_private.sql been run?') }) }, [])
   const of = (k: Kind) => items.filter(x => x.kind === k).sort((a, b) => a.sort - b.sort)
   const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); if (demo) return; savePrivate(next, { upsert: it }).catch(() => { logError('Goals: saving', 'Could not save. Have 005_private.sql and 011_goal_steps.sql been run?'); setErr('Could not save. Have 005_private.sql and 011_goal_steps.sql been run?') }) }
+  const upsertMany = (list: PItem[]) => {
+    const ids = new Set(list.map(x => x.id)); const next = [...items.filter(x => !ids.has(x.id)), ...list]; setItems(next)
+    if (demo) return
+    list.reduce((p, it) => p.then(() => savePrivate(next, { upsert: it })), Promise.resolve()).catch(() => setErr('Could not save.'))
+  }
   const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); if (demo) return; savePrivate(next, { remove: id }).catch(() => setErr('Could not remove.')) }
   const add = (kind: Kind, f: Partial<PItem>) => { const l = of(kind); upsert({ id: `${kind}-${Date.now().toString(36)}`, kind, title: '', sub: '', cat: '', num1: 0, num2: 0, day: null, sort: (l[l.length - 1]?.sort ?? 0) + 1, ...f }) }
   return (
@@ -75,7 +80,7 @@ function Inside({ onLock, tasks, onPush, demo = false }: { onLock: () => void; t
         {sub === 'anchors' && <Anchors list={demo ? DEMO_ANCHORS : undefined} />}
         {sub === 'goals' && <Goals pillars={of('pillar')} steps={of('step')} tasks={tasks} onPush={onPush} demo={demo} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'vision' && <Vision counts={of('countdown')} pins={of('pin')} edit={edit} add={add} upsert={upsert} remove={remove} />}
-        {sub === 'money' && <Money rows={of('money')} step={demo ? 1 : 500} edit={edit} add={add} upsert={upsert} remove={remove} />}
+        {sub === 'money' && <Money rows={of('money')} step={demo ? 1 : 500} upsertMany={upsertMany} edit={edit} add={add} upsert={upsert} remove={remove} />}
       </div>
     </div>
   )
@@ -223,9 +228,14 @@ function Adjust({ value, onChange, start }: { value: number; onChange: (v: numbe
   )
 }
 
-function Money({ rows, step, edit, add, upsert, remove }: { rows: PItem[]; step: number } & Ops) {
+function Money({ rows, step, upsertMany, edit, add, upsert, remove }: { rows: PItem[]; step: number; upsertMany: (l: PItem[]) => void } & Ops) {
   const [n, setN] = useState(''); const [t, setT] = useState(''); const [y, setY] = useState(String(new Date().getFullYear() + 1)); const [sv, setSv] = useState('')
   const years = [...new Set(rows.map(r => r.cat))].sort()
+  /** Swap a goal with its neighbour (renumbers the group so the order always sticks). */
+  const move = (grp: PItem[], idx: number, dir: -1 | 1) => {
+    const order = [...grp]; const [it] = order.splice(idx, 1); order.splice(idx + dir, 0, it)
+    upsertMany(order.map((x, i) => ({ ...x, sort: i + 1 })))
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 22, fontWeight: 600 }}>Money magic</div>
@@ -233,7 +243,7 @@ function Money({ rows, step, edit, add, upsert, remove }: { rows: PItem[]; step:
       {years.map(yr => (
         <div key={yr} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.5, marginTop: 6 }}>BY {yr}</div>
-          {rows.filter(r => r.cat === yr).map(r => {
+          {rows.filter(r => r.cat === yr).sort((a, b) => a.sort - b.sort).map((r, idx, grp) => {
             const pct = r.num2 > 0 ? Math.min(100, Math.round(r.num1 / r.num2 * 100)) : 0
             const left = Math.max(0, r.num2 - r.num1); const per = left / monthsTo(Number(yr))
             return (
@@ -256,6 +266,8 @@ function Money({ rows, step, edit, add, upsert, remove }: { rows: PItem[]; step:
                     <label style={{ width: 130 }}>Target $<input type="number" defaultValue={r.num2} onBlur={e => { const v = Number(e.target.value); if (v > 0 && v !== r.num2) upsert({ ...r, num2: v }) }} style={{ width: '100%' }} /></label>
                     <label style={{ width: 130 }}>Saved so far $<input type="number" aria-label="Saved so far" defaultValue={r.num1} onBlur={e => upsert({ ...r, num1: Number(e.target.value) || 0 })} style={{ width: '100%' }} /></label>
                     <label style={{ width: 110 }}>By Dec<input type="number" aria-label="By year" defaultValue={Number(r.cat)} onBlur={e => { const v = Math.round(Number(e.target.value)); if (v >= new Date().getFullYear() && v < 2100 && String(v) !== r.cat) upsert({ ...r, cat: String(v) }) }} style={{ width: '100%' }} /></label>
+                    <button className="btn small outline" aria-label="Move up" disabled={idx === 0} onClick={() => move(grp, idx, -1)} style={{ height: 30, width: 36, padding: 0 }}>↑</button>
+                    <button className="btn small outline" aria-label="Move down" disabled={idx === grp.length - 1} onClick={() => move(grp, idx, 1)} style={{ height: 30, width: 36, padding: 0 }}>↓</button>
                     <RM onClick={() => remove(r.id)} />
                   </div>)}
               </div>
