@@ -159,12 +159,11 @@ function Goals({ pillars, steps, tasks, onPush, demo, edit, add, upsert, remove 
   )
 }
 
-const CATS = ['Love', 'Money', 'Travel', 'Health', 'Home', 'Career']
 function Vision({ counts, pins, edit, add, upsert, remove }: { counts: PItem[]; pins: PItem[] } & Ops) {
-  const [ct, setCt] = useState(''); const [cd, setCd] = useState(''); const [pt, setPt] = useState(''); const [pc, setPc] = useState(CATS[0]); const [f, setF] = useState('All'); const [pick, setPick] = useState<string | null>(null)
+  const [ct, setCt] = useState(''); const [cd, setCd] = useState(''); const [pt, setPt] = useState(''); const [pick, setPick] = useState<string | null>(null)
   const [big, setBig] = useState<string | null>(null)
   const cs = [...counts].filter(c => c.day).sort((a, b) => a.day!.localeCompare(b.day!))
-  const shown = pins.filter(p => f === 'All' || p.cat === f)
+  const shown = pins
   const bigPin = pins.find(x => x.id === big)
   const tint = (i: number) => `linear-gradient(135deg, hsl(${(i * 47 + 280) % 360} 35% 55%), hsl(${(i * 47 + 330) % 360} 40% 42%))`
   return (
@@ -175,31 +174,27 @@ function Vision({ counts, pins, edit, add, upsert, remove }: { counts: PItem[]; 
           <div onClick={e => e.stopPropagation()} style={{ maxWidth: 'min(94vw, 900px)', maxHeight: '92dvh', borderRadius: 24, overflow: 'hidden', background: 'var(--card)', display: 'flex', flexDirection: 'column' }}>
             {bigPin.img && <img src={bigPin.img} alt={bigPin.title} style={{ width: '100%', maxHeight: '74dvh', objectFit: 'contain', background: '#000' }} />}
             <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}><div className="muted" style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{bigPin.cat.toUpperCase()}</div><div style={{ fontSize: 22, fontWeight: 600 }}>{bigPin.title}</div>{bigPin.img && <Credit credit={bigPin.sub} />}</div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: 22, fontWeight: 600 }}>{bigPin.title}</div>{bigPin.img && <Credit credit={bigPin.sub} />}</div>
               <button className="btn small" onClick={() => setBig(null)}>Close</button>
             </div>
           </div>
         </div>)}
       {cs.length > 0 && (
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-          {cs.map((c, i) => { const n = daysUntil(c.day!); return (
-            <div key={c.id} style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', borderRadius: 999, border: '1.5px solid ' + (i === 0 ? 'var(--accent)' : 'var(--border)'), background: i === 0 ? 'var(--accent)' : 'var(--card)', color: i === 0 ? 'var(--on-accent)' : 'var(--ink)' }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>{c.title}</span>
-              <span style={{ fontSize: 15, fontWeight: 700 }}>{n > 0 ? `${n} days` : n === 0 ? 'Today!' : `${-n}d ago`}</span>
-              {edit && <button aria-label={`Remove ${c.title}`} onClick={() => remove(c.id)} style={{ border: 'none', background: 'transparent', color: 'inherit', fontSize: 18, padding: 0 }}>×</button>}
+          {cs.map(c => { const n = daysUntil(c.day!); return (
+            <div key={c.id} style={{ flex: 'none', display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 16px', borderRadius: 999, border: '1.5px solid var(--border)', background: 'var(--card)' }}>
+              <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)' }}>{c.title}</span>
+              <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{n > 0 ? `${n} days` : n === 0 ? 'Today!' : `${-n}d ago`}</span>
+              {edit && <button aria-label={`Remove ${c.title}`} onClick={() => remove(c.id)} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', fontSize: 18, padding: 0 }}>×</button>}
             </div>) })}
         </div>)}
       {edit && <form style={{ display: 'flex', gap: 8, maxWidth: 640 }} onSubmit={e => { e.preventDefault(); if (ct.trim() && cd) { add('countdown', { title: ct.trim(), day: cd }); setCt(''); setCd('') } }}><input type="text" placeholder="New countdown" value={ct} onChange={e => setCt(e.target.value)} /><input type="date" aria-label="Date" value={cd} onChange={e => setCd(e.target.value)} /><button className="btn small" type="submit">Add</button></form>}
-      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999, alignSelf: 'flex-start', overflowX: 'auto', maxWidth: '100%' }}>
-        {['All', ...CATS].map(c => <button key={c} onClick={() => setF(c)} style={{ flex: 'none', height: 38, padding: '0 16px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: 'none', background: f === c ? 'var(--accent)' : 'transparent', color: f === c ? 'var(--on-accent)' : 'var(--ink)' }}>{c}</button>)}
-      </div>
       {shown.length === 0 && <div className="muted">Nothing here yet. Tap Edit and add something you want in your life.</div>}
       <div className="photo-wall">
         {shown.map((p, i) => (
           <div key={p.id} className="wall-tile" style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', cursor: edit ? 'default' : 'pointer', background: p.img ? '#222' : tint(i), minHeight: p.img ? undefined : 150 + (i % 3) * 30 }} onClick={() => { if (!edit) setBig(p.id) }}>
             {p.img && <img src={p.img} alt={p.title} style={{ display: 'block', width: '100%', height: 'auto' }} />}
             <div style={{ position: p.img ? 'absolute' : 'static', inset: p.img ? 'auto 0 0 0' : undefined, padding: '26px 14px 12px', color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.5)', background: p.img ? 'linear-gradient(transparent, rgba(0,0,0,.65))' : 'none', ...(p.img ? {} : { height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 150 }) }}>
-              <div style={{ fontSize: 11, fontWeight: 700, opacity: .85, letterSpacing: 1 }}>{p.cat.toUpperCase()}</div>
               <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>{p.title}</div>
               {p.img && <Credit credit={p.sub} />}
               {edit && <div style={{ marginTop: 8, display: 'flex', gap: 6 }}><button className="btn small outline" onClick={e => { e.stopPropagation(); setPick(p.id) }}>{p.img ? 'Change photo' : 'Add photo'}</button><RM onClick={() => remove(p.id)} /></div>}
@@ -207,7 +202,7 @@ function Vision({ counts, pins, edit, add, upsert, remove }: { counts: PItem[]; 
           </div>
         ))}
       </div>
-      {edit && <form style={{ display: 'flex', gap: 8, maxWidth: 640 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pin', { title: pt.trim(), cat: pc }); setPt('') } }}><input type="text" placeholder="New vision, e.g. A garden full of flowers" value={pt} onChange={e => setPt(e.target.value)} /><select aria-label="Category" value={pc} onChange={e => setPc(e.target.value)}>{CATS.map(c => <option key={c}>{c}</option>)}</select><button className="btn small" type="submit">Add</button></form>}
+      {edit && <form style={{ display: 'flex', gap: 8, maxWidth: 640 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pin', { title: pt.trim(), cat: '' }); setPt('') } }}><input type="text" placeholder="New vision, e.g. A garden full of flowers" value={pt} onChange={e => setPt(e.target.value)} /><button className="btn small" type="submit">Add</button></form>}
     </div>
   )
 }
