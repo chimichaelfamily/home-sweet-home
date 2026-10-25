@@ -240,7 +240,7 @@ function Habits({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
       <div className="card scroll" style={{ flex: 1, padding: '14px 24px' }}>
         {hs.length === 0 && <div className="muted" style={{ padding: 16, fontSize: 17 }}>No habits yet. Add some in Settings.</div>}
         <div style={{ display: 'grid', gridTemplateColumns: `170px repeat(${n}, 1fr) 100px`, alignItems: 'center', rowGap: 4 }}>
-          <div />{Array.from({ length: n }, (_, i) => <div key={i} className="muted" style={{ fontSize: 11, textAlign: 'center' }}>{i + 1}</div>)}<div className="muted" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>STREAK</div>
+          <div />{Array.from({ length: n }, (_, i) => { const isT = dayKey(i + 1) === t; return <div key={i} className={isT ? '' : 'muted'} style={{ fontSize: isT ? 15 : 11, textAlign: 'center', ...(isT ? { fontWeight: 800, color: 'var(--accent)' } : {}) }}>{i + 1}</div> })}<div className="muted" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>STREAK</div>
           {hs.map((h, hi) => (
             <HabitRow key={h.id} name={h.name} n={n} done={sets[hi]} dayKey={dayKey} today={t} streakN={streak(sets[hi], t)} onToggle={d => apply(A.toggleHabit(s, h.id, dayKey(d)))} />
           ))}
