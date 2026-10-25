@@ -175,3 +175,17 @@ import { parseDialogue, parseFact, wordCount } from './ktext.ts'
   assert.strictEqual(wordCount('  one two  three '), 3)
   console.log('knowledge tests passed')
 }
+
+import { goodreadsBooks, dailyIndex } from './ktext.ts'
+{
+  const csv = 'Book Id,Title,Author,My Rating,Exclusive Shelf,My Review,Date Read\n1,"Atomic Habits",James Clear,5,read,"Great<br/>book",2024/05/01\n2,"Dune, Part One",Frank Herbert,0,to-read,,\n3,Deep Work,Cal Newport,0,currently-reading,,\n'
+  const b = goodreadsBooks(csv)
+  assert.strictEqual(b.length, 3)
+  assert.deepStrictEqual([b[0].status, b[0].rating, b[0].review], ['done', 5, 'Great\nbook'])
+  assert.strictEqual(b[1].title, 'Dune, Part One')
+  assert.strictEqual(b[1].status, 'want')
+  assert.strictEqual(b[2].status, 'reading')
+  assert.strictEqual(dailyIndex('2026-10-25', 'fact', 10), dailyIndex('2026-10-25', 'fact', 10))
+  assert.ok(dailyIndex('2026-10-25', 'fact', 10) < 10)
+  console.log('goodreads and bank tests passed')
+}

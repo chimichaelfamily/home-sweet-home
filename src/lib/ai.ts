@@ -13,6 +13,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 export interface Msg { role: 'user' | 'model'; text: string }
 export const askAI = async (messages: Msg[], system?: string) => (await post<{ text: string }>('/api/ai', { messages, system })).text
+export const askBank = (kind: 'fact' | 'talk' | 'speech', avoid: string[], topics: string[] = []) => post<{ items: unknown[] }>('/api/bank', { kind, avoid, topics })
 export interface Scan { name: string | null; type: string | null; where: string | null; printed_expiry: string | null; shelf_months: number | null; notes?: string | null }
 export const scanProduct = (images: { mime: string; data: string }[]) => post<Scan>('/api/scan', { images })
 

@@ -12,8 +12,9 @@ export async function loadKnowledge(): Promise<KItem[]> {
   }
   try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] }
 }
-export async function saveKnowledge(all: KItem[], op: { upsert?: KItem; remove?: string }) {
+export async function saveKnowledge(all: KItem[], op: { upsert?: KItem; remove?: string; many?: KItem[] }) {
   if (supabase) {
+    if (op.many?.length) { const { error } = await supabase.from('knowledge_items').upsert(op.many, { onConflict: 'id' }); if (error) throw error }
     if (op.upsert) { const { error } = await supabase.from('knowledge_items').upsert(op.upsert, { onConflict: 'id' }); if (error) throw error }
     if (op.remove) { const { error } = await supabase.from('knowledge_items').delete().eq('id', op.remove); if (error) throw error }
     return

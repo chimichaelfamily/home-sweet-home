@@ -63,3 +63,50 @@ export function parseFact(raw: string, cat: string): Fact {
   if (!text) text = raw.replace(/[*_#>]/g, '').trim()
   return { text, why, cat }
 }
+
+// ---- Goodreads import (My Books → Import and export → Export library) ----
+/** Reads CSV text into rows of cells, handling quotes, commas and line breaks inside quotes. */
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = []; let row: string[] = []; let cell = ''; let q = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++ } else q = false }
+      else cell += c
+    } else if (c === '"') q = true
+    else if (c === ',') { row.push(cell); cell = '' }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = '' }
+    else cell += c
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row) }
+  return rows.filter(r => r.some(x => x.trim()))
+}
+export interface GrBook { title: string; author: string; status: 'reading' | 'want' | 'done'; rating: number; review: string; dateRead: string }
+export function goodreadsBooks(csv: string): GrBook[] {
+  const rows = parseCsv(csv.replace(/^﻿/, ''))
+  if (rows.length < 2) return []
+  const h = rows[0].map(x => x.trim().toLowerCase())
+  const col = (name: string) => h.indexOf(name)
+  const iT = col('title'), iA = col('author'), iR = col('my rating'), iS = col('exclusive shelf'), iV = col('my review'), iD = col('date read')
+  if (iT < 0) return []
+  return rows.slice(1).map(r => {
+    const shelf = (r[iS] ?? '').trim().toLowerCase()
+    return {
+      title: (r[iT] ?? '').trim(),
+      author: iA >= 0 ? (r[iA] ?? '').trim() : '',
+      status: shelf === 'read' ? 'done' : shelf === 'currently-reading' ? 'reading' : 'want',
+      rating: Math.max(0, Math.min(5, Number(r[iR]) || 0)),
+      review: iV >= 0 ? (r[iV] ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim() : '',
+      dateRead: iD >= 0 ? (r[iD] ?? '').trim() : '',
+    } as GrBook
+  }).filter(b => b.title)
+}
+
+// ---- weekly practice bank ----
+export interface BankTalk { topic: string; setting: string; lines: { who: string; text: string }[]; tip: string; phrases: string[] }
+export interface BankSpeech { title: string; occasion: string; text: string; focus: string }
+/** Same pick all day, a different one tomorrow. */
+export function dailyIndex(day: string, kind: string, n: number): number {
+  let h = 0; for (const ch of day + kind) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return n ? h % n : 0
+}
