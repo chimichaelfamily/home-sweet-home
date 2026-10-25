@@ -82,7 +82,7 @@ function Inside({ onLock, tasks, onPush, demo = false }: { onLock: () => void; t
 }
 
 interface Ops { edit: boolean; add: (k: Kind, f: Partial<PItem>) => void; upsert: (i: PItem) => void; remove: (id: string) => void }
-const RM = ({ onClick }: { onClick: () => void }) => <button className="btn small outline" onClick={onClick}>Remove</button>
+const RM = ({ onClick }: { onClick: () => void }) => <button className="btn small outline" style={{ height: 30, fontSize: 13, padding: '0 12px' }} onClick={onClick}>Remove</button>
 
 function Goals({ pillars, steps, tasks, onPush, demo, edit, add, upsert, remove }: { pillars: PItem[]; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string; demo: boolean } & Ops) {
   const [pt, setPt] = useState('')
@@ -113,7 +113,7 @@ function Goals({ pillars, steps, tasks, onPush, demo, edit, add, upsert, remove 
             <div style={{ height: 12, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 12, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
             {edit && mine.length === 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><label className="muted" style={{ fontSize: 13 }}>Progress %</label><input type="number" min={0} max={100} aria-label="Percent" defaultValue={p.num1} onBlur={e => upsert({ ...p, num1: Math.min(100, Number(e.target.value) || 0) })} style={{ width: 100 }} /></div>}
             {(() => {
-              const isOpen = openGoals.has(p.id); const todo = mine.filter(x => !isDone(x)); const doneSteps = mine.filter(isDone); const nextStep = todo[0]
+              const isOpen = openGoals.has(p.id); const todo = mine.filter(x => !isDone(x)); const doneSteps = mine.filter(isDone)
               const toggle = () => { const n = new Set(openGoals); if (isOpen) n.delete(p.id); else n.add(p.id); setOpenGoals(n) }
               const stepRow = (st: PItem) => {
                 const d = isDone(st); const t = inTodo(st)
@@ -130,9 +130,7 @@ function Goals({ pillars, steps, tasks, onPush, demo, edit, add, upsert, remove 
               return (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    {nextStep && !isOpen && <div className="muted" style={{ flex: 1, minWidth: 0, fontSize: 14 }}>Next: {nextStep.title}</div>}
-                    {!nextStep && !isOpen && <div style={{ flex: 1 }} />}
-                    {isOpen && <div style={{ flex: 1 }} />}
+                    <div style={{ flex: 1 }} />
                     <button onClick={toggle} style={{ border: 'none', background: 'none', padding: 0, fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>{isOpen ? 'Hide steps' : mine.length ? `Steps (${mine.length})` : 'Add steps'}</button>
                   </div>
                   {isOpen && (
