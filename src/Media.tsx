@@ -1,98 +1,68 @@
-// One place that plays videos and music for the whole app, so playback keeps going when you change tabs.
-// The players are fixed on screen: a video sits over its spot on the Affirmation page, or shrinks to the corner.
+// Background music for the whole app: it keeps playing when you change tabs, in a small player in the corner.
+// Tap the corner player to open it big (to pick the part you want), and ✕ to stop.
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { playerSrc } from './lib/embed.ts'
 
 export interface Media { id: string; title: string; kind: 'youtube' | 'spotify'; src: string }
-interface Ctx {
-  video: Media | null; music: Media | null
-  playVideo: (id: string, title: string, url: string) => void
-  playMusic: (id: string, title: string, url: string, then?: string[]) => void
-  stop: (which: 'video' | 'music') => void
-  setSlot: (el: HTMLElement | null) => void
-}
+interface Ctx { music: Media | null; playMusic: (id: string, title: string, url: string) => void; stopMusic: () => void }
 const MediaCtx = createContext<Ctx | null>(null)
 export const useMedia = () => useContext(MediaCtx)!
 
 export function MediaProvider({ children }: { children: ReactNode }) {
-  const [video, setVideo] = useState<Media | null>(null)
   const [music, setMusic] = useState<Media | null>(null)
-  const slot = useRef<HTMLElement | null>(null)
-  const [, bump] = useState(0)
-  const playVideo = useCallback((id: string, title: string, url: string) => { const p = playerSrc(url); if (p) setVideo({ id, title, ...p }) }, [])
-  const playMusic = useCallback((id: string, title: string, url: string, then: string[] = []) => { const p = playerSrc(url, then); if (p) setMusic({ id, title, ...p }) }, [])
-  const stop = useCallback((w: 'video' | 'music') => (w === 'video' ? setVideo(null) : setMusic(null)), [])
-  const setSlot = useCallback((el: HTMLElement | null) => { slot.current = el; bump(n => n + 1) }, [])
+  const playMusic = useCallback((id: string, title: string, url: string) => { const p = playerSrc(url); if (p) setMusic({ id, title, ...p }) }, [])
+  const stopMusic = useCallback(() => setMusic(null), [])
   return (
-    <MediaCtx.Provider value={{ video, music, playVideo, playMusic, stop, setSlot }}>
+    <MediaCtx.Provider value={{ music, playMusic, stopMusic }}>
       {children}
-      <Dock video={video} music={music} slot={slot} stop={stop} />
+      {music && <MusicDock key={music.id} music={music} stop={stopMusic} />}
     </MediaCtx.Provider>
   )
 }
 
-const send = (f: HTMLIFrameElement | null, func: 'pauseVideo' | 'playVideo') => f?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*')
+const send = (f: HTMLIFrameElement | null, msg: object) => f?.contentWindow?.postMessage(JSON.stringify(msg), '*')
 
-function Dock({ video, music, slot, stop }: { video: Media | null; music: Media | null; slot: React.MutableRefObject<HTMLElement | null>; stop: (w: 'video' | 'music') => void }) {
-  const vf = useRef<HTMLIFrameElement>(null), mf = useRef<HTMLIFrameElement>(null)
-  const [box, setBox] = useState<{ top: number; left: number; width: number; height: number; clip: string } | null>(null)
-  const [paused, setPaused] = useState<{ video: boolean; music: boolean }>({ video: false, music: false })
-  useEffect(() => setPaused(p => ({ ...p, video: false })), [video?.id])
-  useEffect(() => setPaused(p => ({ ...p, music: false })), [music?.id, music?.src])
-  // Follow the video's spot on the Affirmation page (it scrolls), every frame.
+function MusicDock({ music, stop }: { music: Media; stop: () => void }) {
+  const f = useRef<HTMLIFrameElement>(null)
+  const [big, setBig] = useState(false)
+  const [paused, setPaused] = useState(false)
+  const [hint, setHint] = useState(false)
+  const state = useRef(-1)
+  // Listen to the YouTube player so we know whether it really started (the iPad sometimes needs one tap).
   useEffect(() => {
-    if (!video) { setBox(null); return }
-    let raf = 0
-    const tick = () => {
-      const el = slot.current
-      if (el && el.isConnected && el.offsetParent) {
-        const r = el.getBoundingClientRect()
-        const boxes = [el.closest('.scroll'), el.closest('.main')].filter((x): x is HTMLElement => !!x).map(x => x.getBoundingClientRect())
-        const area = { top: Math.max(0, ...boxes.map(b => b.top)), bottom: Math.min(innerHeight, ...boxes.map(b => b.bottom)) }
-        const visible = r.bottom > area.top && r.top < area.bottom && r.width > 0
-        if (visible) {
-          const clip = `inset(${Math.max(0, area.top - r.top)}px 0px ${Math.max(0, r.bottom - area.bottom)}px 0px round 16px)`
-          setBox(b => (b && b.top === r.top && b.left === r.left && b.width === r.width && b.height === r.height && b.clip === clip ? b : { top: r.top, left: r.left, width: r.width, height: r.height, clip }))
-        } else setBox(b => (b === null ? b : null))
-      } else setBox(b => (b === null ? b : null))
-      raf = requestAnimationFrame(tick)
+    const on = (e: MessageEvent) => {
+      if (e.source !== f.current?.contentWindow || typeof e.data !== 'string') return
+      try { const d = JSON.parse(e.data); const s = d?.info?.playerState; if (typeof s === 'number') { state.current = s; if (s === 1) { setHint(false); setPaused(false) } if (s === 2) setPaused(true) } } catch { /* not ours */ }
     }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [video, slot])
-  const mini = !box
-  const toggle = (w: 'video' | 'music') => { const f = w === 'video' ? vf.current : mf.current; send(f, paused[w] ? 'playVideo' : 'pauseVideo'); setPaused({ ...paused, [w]: !paused[w] }) }
-  const bar = (w: 'video' | 'music', m: Media) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: 'var(--card)' }}>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)' }}>{m.title}</span>
-      {m.kind === 'youtube' && <button className="dock-btn" aria-label={paused[w] ? 'Play' : 'Pause'} onClick={() => toggle(w)}>{paused[w] ? '▶' : '❚❚'}</button>}
-      <button className="dock-btn" aria-label="Stop" onClick={() => stop(w)}>✕</button>
-    </div>
-  )
+    window.addEventListener('message', on)
+    return () => window.removeEventListener('message', on)
+  }, [])
+  const loaded = () => {
+    if (music.kind !== 'youtube') return
+    send(f.current, { event: 'listening', id: 1, channel: 'widget' })
+    setTimeout(() => { if (state.current !== 1) { setBig(true); setHint(true) } }, 3000)
+  }
+  const toggle = () => { send(f.current, { event: 'command', func: paused ? 'playVideo' : 'pauseVideo', args: [] }); setPaused(!paused) }
+  const yt = music.kind === 'youtube'
   return (
     <>
-      {video && (
-        <div className={mini ? 'dock-card' : ''} style={mini
-          ? { position: 'fixed', right: 16, bottom: music ? 172 : 96, width: 260, zIndex: 40 }
-          : { position: 'fixed', top: box!.top, left: box!.left, width: box!.width, height: box!.height, clipPath: box!.clip, zIndex: 5, borderRadius: 16, overflow: 'hidden', background: '#000' }}>
-          <iframe ref={vf} key={video.id + video.src} title={video.title} src={video.src} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen
-            style={{ display: 'block', width: '100%', height: mini ? 146 : '100%', border: 0, background: '#000' }} />
-          {mini && bar('video', video)}
-        </div>)}
-      {music && (
-        <div className="dock-card" style={{ position: 'fixed', right: 16, bottom: 96, width: 300, zIndex: 40, display: 'flex', alignItems: 'center' }}>
-          <iframe ref={mf} key={music.id + music.src} title={music.title} src={music.src} allow="autoplay; encrypted-media; clipboard-write"
-            style={{ display: 'block', width: music.kind === 'spotify' ? 150 : 112, height: music.kind === 'spotify' ? 80 : 63, border: 0, background: '#000', flex: 'none' }} />
-          <div style={{ flex: 1, minWidth: 0 }}>{bar('music', music)}</div>
-        </div>)}
+      {big && <div onClick={() => setBig(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,16,30,.55)', zIndex: 44 }} />}
+      <div className="dock-card" style={big
+        ? { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(92vw, 760px)', zIndex: 45, display: 'flex', flexDirection: 'column' }
+        : { position: 'fixed', right: 16, bottom: 96, width: 300, zIndex: 40, display: 'flex', alignItems: 'center' }}>
+        <iframe ref={f} title={music.title} src={music.src} onLoad={loaded} allow="autoplay; encrypted-media; clipboard-write; picture-in-picture; fullscreen" allowFullScreen
+          style={big ? { display: 'block', width: '100%', aspectRatio: yt ? '16 / 9' : undefined, height: yt ? 'auto' : 152, border: 0, background: '#000' }
+            : { display: 'block', width: yt ? 112 : 150, height: yt ? 63 : 80, border: 0, background: '#000', flex: 'none' }} />
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, padding: big ? '10px 14px' : '6px 8px', background: 'var(--card)' }}>
+          <button onClick={() => setBig(!big)} style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 'none', background: 'none', padding: 0, color: 'var(--ink)' }}>
+            <div style={{ fontSize: big ? 16 : 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{music.title}</div>
+            {hint && big && <div className="muted" style={{ fontSize: 13 }}>Tap play on the video once to start the sound.</div>}
+          </button>
+          {yt && <button className="dock-btn" aria-label={paused ? 'Play' : 'Pause'} onClick={toggle}>{paused ? '▶' : '❚❚'}</button>}
+          <button className="dock-btn" aria-label={big ? 'Make small' : 'Open big'} onClick={() => setBig(!big)}>{big ? '↘' : '⤢'}</button>
+          <button className="dock-btn" aria-label="Stop" onClick={stop}>✕</button>
+        </div>
+      </div>
     </>
   )
-}
-
-/** The big spot where the current workout video shows on the Affirmation page. */
-export function VideoSlot() {
-  const { setSlot, video } = useMedia()
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => { setSlot(ref.current); return () => setSlot(null) }, [setSlot])
-  return <div ref={ref} style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 16, background: video ? '#000' : 'var(--ground)' }} />
 }

@@ -9,7 +9,7 @@ import { WeatherScene } from './WeatherScene.tsx'
 import { skyOf } from './lib/photos.ts'
 import { clearErrors, getErrors, installGlobalHandlers, logError, markSeen, unseenCount } from './lib/errorlog.ts'
 import { playerSrc } from './lib/embed.ts'
-import { MediaProvider, useMedia, VideoSlot } from './Media.tsx'
+import { MediaProvider, useMedia } from './Media.tsx'
 import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
 import { lockRegister, lockRegistered, lockReset, lockSupported } from './lib/privateData.ts'
@@ -485,9 +485,11 @@ function Morning() {
   }
   const cur = aff[Math.min(i, Math.max(0, aff.length - 1))]
   const media = useMedia()
-  const row = (it: MItem, kind: 'link' | 'song', list: MItem[]) => {
+  const [watching, setWatching] = useState<MItem | null>(null)
+  const watchSrc = watching ? playerSrc(watching.url) : null
+  const row = (it: MItem, kind: 'link' | 'song') => {
     const can = !!(it.url && playerSrc(it.url))
-    const on = kind === 'link' ? media.video?.id === it.id : media.music?.id === it.id
+    const on = kind === 'link' ? watching?.id === it.id : media.music?.id === it.id
     return (
       <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 54, borderBottom: '1px solid var(--border)' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -495,8 +497,8 @@ function Morning() {
           {it.sub && <div className="muted" style={{ fontSize: 13 }}>{it.sub}</div>}
         </div>
         {edit ? <button className="btn small outline" style={{ height: 34, fontSize: 13 }} onClick={() => remove(it.id)}>Remove</button>
-          : can ? (on ? <button className="btn small outline" style={{ height: 36, fontSize: 13 }} onClick={() => media.stop(kind === 'link' ? 'video' : 'music')}>Stop</button>
-            : <button className="btn small" style={{ height: 36, fontSize: 13 }} onClick={() => kind === 'link' ? media.playVideo(it.id, it.title, it.url) : media.playMusic(it.id, it.title, it.url, list.slice(list.indexOf(it) + 1).map(x => x.url))}>{kind === 'song' ? 'Play' : 'Watch'}</button>)
+          : can ? (on ? <button className="btn small outline" style={{ height: 36, fontSize: 13 }} onClick={() => kind === 'link' ? setWatching(null) : media.stopMusic()}>Stop</button>
+            : <button className="btn small" style={{ height: 36, fontSize: 13 }} onClick={() => { if (kind === 'link') { media.stopMusic(); setWatching(it) } else { setWatching(null); media.playMusic(it.id, it.title, it.url) } }}>{kind === 'song' ? 'Play' : 'Watch'}</button>)
           : it.url ? <a className="btn small outline" href={it.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', height: 36, fontSize: 13 }}>Open</a>
           : <span className="muted" style={{ fontSize: 13 }}>No link</span>}
       </div>
@@ -513,6 +515,16 @@ function Morning() {
   }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {watching && watchSrc && (
+        <div className="overlay" style={{ zIndex: 46, padding: 16 }} onClick={() => setWatching(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(96vw, 1100px)', borderRadius: 24, overflow: 'hidden', background: 'var(--card)', boxShadow: '0 24px 64px rgba(0,0,0,.45)' }}>
+            <iframe title={watching.title} src={watchSrc.src} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', maxHeight: '78dvh', border: 0, background: '#000' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px' }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 18, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{watching.title}</div>
+              <button className="btn small" onClick={() => setWatching(null)}>Close</button>
+            </div>
+          </div>
+        </div>)}
       {picking && (() => { const a = items.find(x => x.id === picking); return a ? <PhotoPicker onPick={(img, credit) => { upsert({ ...a, img, sub: img && credit ? credit : '' }); setPicking(null) }} onClose={() => setPicking(null)} /> : null })()}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Affirmation</div>
@@ -521,7 +533,8 @@ function Morning() {
         <PersonToggle who={who} setWho={w => { setWho(w); setI(0) }} />
       </div>
       <div className="scroll" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 20 }}>
-        <div className="aff-card" style={{ flex: 'none', minHeight: 360, borderRadius: 28, padding: 28, display: 'flex', flexDirection: 'column', gap: 14, color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,.35)', background: cur?.img ? `linear-gradient(rgba(20,12,30,.35),rgba(20,12,30,.55)), center / cover url("${cur.img}")` : 'linear-gradient(135deg,var(--accent),var(--g2))' }}>
+        <div className="cols" style={{ display: 'flex', gap: 14, alignItems: 'stretch', flex: 'none' }}>
+        <div className="aff-card" style={{ flex: 1.3, minWidth: 0, minHeight: 360, borderRadius: 28, padding: 28, display: 'flex', flexDirection: 'column', gap: 14, color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,.35)', background: cur?.img ? `linear-gradient(rgba(20,12,30,.35),rgba(20,12,30,.55)), center / cover url("${cur.img}")` : 'linear-gradient(135deg,var(--accent),var(--g2))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}><span>1 · READ YOUR AFFIRMATIONS</span><span>{aff.length ? `${Math.min(i, aff.length - 1) + 1} of ${aff.length}` : ''}</span></div>
           {!edit && <>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', fontSize: 36, fontWeight: 600, lineHeight: 1.2 }}>{cur ? cur.title : 'No affirmations yet. Tap Edit to add some.'}</div>
@@ -536,22 +549,22 @@ function Morning() {
             <form onSubmit={e => { e.preventDefault(); const f = e.currentTarget.elements.namedItem('new') as HTMLInputElement; if (f.value.trim()) { add('affirmation', f.value.trim()); f.value = '' } }} style={{ display: 'flex', gap: 8 }}><input name="new" type="text" placeholder="New affirmation" /><button className="btn small" type="submit" style={{ background: '#fff', color: 'var(--ink)' }}>Add</button></form>
           </div>}
         </div>
-        <div className="card" style={{ flex: 'none', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div className="muted" style={{ fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}>2 · MOVE YOUR BODY</div>
-          {media.video && links.some(l => l.id === media.video!.id) && <VideoSlot />}
-          <div>
-            {links.length === 0 && !edit && <div className="muted" style={{ fontSize: 15, padding: '8px 0' }}>No videos yet. Tap Edit and paste a YouTube link.</div>}
-            {links.map(l => row(l, 'link', links))}
-          </div>
-          {edit && <AddForm kind="link" ph="Name, e.g. Morning stretch" subPh="Note, e.g. YouTube · 20 min" />}
-        </div>
-        <div className="card" style={{ flex: 'none', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div className="muted" style={{ fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}>3 · MORNING MUSIC</div>
+        <div className="card" style={{ flex: 1, minWidth: 0, maxHeight: 460, overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="muted" style={{ fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}>2 · MORNING MUSIC</div>
           <div>
             {songs.length === 0 && !edit && <div className="muted" style={{ fontSize: 15, padding: '8px 0' }}>No songs yet. Tap Edit and paste a YouTube or Spotify link.</div>}
-            {songs.map(sg => row(sg, 'song', songs))}
+            {songs.map(sg => row(sg, 'song'))}
           </div>
           {edit && <AddForm kind="song" ph="Song or playlist" subPh="Artist" />}
+        </div>
+        </div>
+        <div className="card" style={{ flex: 'none', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="muted" style={{ fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}>3 · MOVE YOUR BODY</div>
+          <div>
+            {links.length === 0 && !edit && <div className="muted" style={{ fontSize: 15, padding: '8px 0' }}>No videos yet. Tap Edit and paste a YouTube link.</div>}
+            {links.map(l => row(l, 'link'))}
+          </div>
+          {edit && <AddForm kind="link" ph="Name, e.g. Morning stretch" subPh="Note, e.g. YouTube · 20 min" />}
         </div>
       </div>
     </div>
