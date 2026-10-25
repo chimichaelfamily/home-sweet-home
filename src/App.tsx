@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, backupAll, lastBackup, markBackup, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
+import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
 import { MonthCalendar } from './MonthCalendar.tsx'
@@ -842,13 +842,6 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
   const t = today()
   const sorted = useMemo(() => [...s.rules].sort((a, b) => (nextDue(a) ?? 'z') < (nextDue(b) ?? 'z') ? -1 : 1), [s.rules])
   const label: Record<string, string> = { overdue: 'Overdue', today: 'Due today', soon: 'Within 30 days', ok: 'OK', skipped: 'Skipped', notstarted: 'Not started' }
-  const [bk, setBk] = useState(lastBackup())
-  const download = async () => {
-    const all = await backupAll(s)
-    const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'application/json' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `home-backup-${t}.json`; a.click()
-    markBackup(t); setBk(t)
-  }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {ruleDlg && <RuleDialog key={ruleDlg === 'new' ? 'new' : ruleDlg.id} rule={ruleDlg === 'new' ? null : ruleDlg} onClose={() => setRuleDlg(null)}
@@ -934,9 +927,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
           {sec === 'backup' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 520 }}>
               <div style={{ fontSize: 30, fontWeight: 600 }}>Backup</div>
-              <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Everything is copied to GitHub automatically every Monday morning. You can also download a copy now.</div>
-              <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={download}>Download backup</button>
-              <div className="muted" style={{ fontSize: 15 }}>{bk ? `Last backup: ${bk}` : 'No backup yet.'} The backup file contains your private goals and money, so keep it private.</div>
+              <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Everything is copied to GitHub automatically every Saturday at 3am, into the backups branch of your repo.</div>
               {!usingDatabase && <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset demo data on this device?')) { try { localStorage.removeItem('home-sweet-home.v1') } catch { /* ignore */ } apply({ state: emptyState(), ops: [] }) } }}>Reset demo data</button>}
             </div>
           )}
