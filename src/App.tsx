@@ -13,6 +13,8 @@ import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
 import { lockRegister, lockRegistered, lockReset, lockSupported } from './lib/privateData.ts'
 import { Knowledge } from './Knowledge.tsx'
+import { getGoodreadsUrl, importGoodreadsList, lastGoodreadsSync, setGoodreadsUrl, syncGoodreads } from './lib/knowledge.ts'
+import { goodreadsBooks } from './lib/ktext.ts'
 import { IconView } from './CalIconArt.tsx'
 import { getCalIcons, setCalIcon, TET_ICONS, VEG_ICONS } from './lib/calIcons.ts'
 import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
@@ -794,6 +796,39 @@ function RuleDialog({ rule, onSave, onDelete, onClose }: { rule: Rule | null; on
   )
 }
 
+function GoodreadsSettings() {
+  const file = useRef<HTMLInputElement>(null)
+  const [msg, setMsg] = useState('')
+  const [url, setUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [last, setLast] = useState(lastGoodreadsSync())
+  useEffect(() => { getGoodreadsUrl().then(setUrl).catch(() => setUrl('')) }, [])
+  const importCsv = async (f: File | undefined) => {
+    if (!f) return
+    const list = goodreadsBooks(await f.text())
+    if (!list.length) { setMsg('That file does not look like a Goodreads export.'); return }
+    try { const r = await importGoodreadsList(list); setMsg(`Imported: ${r.added} new, ${r.updated} updated.`) } catch (e) { logError('Goodreads import', e); setMsg('Could not save. Has 012_knowledge.sql been run?') }
+  }
+  const sync = async (u: string) => {
+    setBusy(true); setMsg('')
+    try { const r = await syncGoodreads(u); setLast(lastGoodreadsSync()); setMsg(`Synced ${r.seen} books from Goodreads: ${r.added} new, ${r.updated} updated.`) }
+    catch (e) { logError('Goodreads sync', e); setMsg((e as Error).message) } finally { setBusy(false) }
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640 }}>
+      <div style={{ fontSize: 30, fontWeight: 600 }}>Goodreads</div>
+      <div style={{ fontSize: 20, fontWeight: 600 }}>Import everything once</div>
+      <div className="muted" style={{ fontSize: 15 }}>goodreads.com → My Books → Import and export → Export library, then choose that file.</div>
+      <div><button className="btn small" onClick={() => file.current?.click()}>Choose Goodreads file</button><input ref={file} type="file" accept=".csv,text/csv" hidden onChange={e => { importCsv(e.target.files?.[0]); e.target.value = '' }} /></div>
+      <div style={{ fontSize: 20, fontWeight: 600, marginTop: 8 }}>Keep in sync every day</div>
+      <div className="muted" style={{ fontSize: 15 }}>On goodreads.com open My Books, scroll to the bottom and copy the RSS link. New books, shelves and ratings then come into the app by themselves.</div>
+      {url !== null && <input type="text" defaultValue={url} placeholder="https://www.goodreads.com/review/list_rss/…" onBlur={async e => { const v = e.target.value.trim(); if (v === url) return; if (v && !/^https:\/\/(www\.)?goodreads\.com\/review\/list_rss\//.test(v)) { setMsg('That is not a Goodreads RSS link.'); return } try { await setGoodreadsUrl(v); setUrl(v); setMsg(v ? 'Saved.' : 'Removed.'); if (v) sync(v) } catch (er) { logError('Goodreads link', er); setMsg('Could not save the link.') } }} />}
+      {url && <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><button className="btn small outline" disabled={busy} onClick={() => sync(url)}>{busy ? 'Syncing…' : 'Sync now'}</button><span className="muted" style={{ fontSize: 14 }}>{last ? `Last synced ${new Date(last).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Not synced yet'}</span></div>}
+      {msg && <div style={{ fontSize: 15 }}>{msg}</div>}
+    </div>
+  )
+}
+
 function FaceIdSettings() {
   const [reg, setReg] = useState(lockRegistered())
   const [msg, setMsg] = useState('')
@@ -809,7 +844,7 @@ function FaceIdSettings() {
 }
 
 function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen, onDone }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void; mode: 'light' | 'dark' | 'auto'; setMode: (m: 'light' | 'dark' | 'auto') => void; openSec: 'errors' | 'reminders' | null; clearOpen: () => void; onDone: (p: NonNullable<Pending>) => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'reminders' | 'habits' | 'faces' | 'faceid' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
+  const [sec, setSec] = useState<'look' | 'rules' | 'reminders' | 'habits' | 'faces' | 'faceid' | 'calendars' | 'products' | 'goodreads' | 'backup' | 'errors'>('look')
   const [ruleDlg, setRuleDlg] = useState<Rule | 'new' | null>(null)
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
@@ -833,9 +868,9 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
         onDelete={() => { if (ruleDlg !== 'new' && confirm(`Delete "${ruleDlg.name}"?`)) { setRuleDlg(null); apply(A.deleteRule(s, ruleDlg.id)) } }} />}
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
-        <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['faceid', 'Face ID'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
-            <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
+        <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', minHeight: 0 }}>
+          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['faceid', 'Face ID'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['goodreads', 'Goodreads'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
+            <button key={id} onClick={() => setSec(id)} style={{ flex: 'none', minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
         <div className="card scroll" style={{ flex: 1, minWidth: 0, padding: 26 }}>
@@ -905,6 +940,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
           )}
           {sec === 'faces' && <FaceSettings />}
           {sec === 'faceid' && <FaceIdSettings />}
+          {sec === 'goodreads' && <GoodreadsSettings />}
           {sec === 'calendars' && <CalendarSettings />}
           {sec === 'products' && <div style={{ height: '100%', minWidth: 0 }}><Products /></div>}
           {sec === 'backup' && (

@@ -3,8 +3,9 @@ import { logError } from './lib/errorlog.ts'
 import { askAI } from './lib/ai.ts'
 import { factsOf, hasThisWeek, loadBank, refill, speechesOf, talksOf, type BankKind, type BankRow } from './lib/bank.ts'
 import { today } from './lib/dates.ts'
+import { autoSyncGoodreads } from './lib/knowledge.ts'
 import {
-  dailyIndex, goodreadsBooks, type BankSpeech, type BankTalk, FALLBACK_FACTS, SETTINGS, TOPICS, fmtMinutes, loadKnowledge, parseDialogue, parseFact, pickRandom, saveKnowledge, shuffled, speakMinutes, wordCount,
+  dailyIndex, type BankSpeech, type BankTalk, FALLBACK_FACTS, SETTINGS, TOPICS, fmtMinutes, loadKnowledge, parseDialogue, parseFact, pickRandom, saveKnowledge, shuffled, speakMinutes, wordCount,
   type Dialogue, type Fact, type KItem, type KKind,
 } from './lib/knowledge.ts'
 
@@ -30,7 +31,11 @@ export function Knowledge() {
   const [sub, setSub] = useState<Sub>('books')
   const [items, setItems] = useState<KItem[]>([])
   const [err, setErr] = useState('')
-  useEffect(() => { loadKnowledge().then(setItems).catch(e => { logError('Knowledge: loading', e); setErr(MIGRATION_HINT) }) }, [])
+  useEffect(() => {
+    const reload = () => loadKnowledge().then(setItems).catch(e => { logError('Knowledge: loading', e); setErr(MIGRATION_HINT) })
+    reload(); autoSyncGoodreads()
+    window.addEventListener('hsh-knowledge', reload); return () => window.removeEventListener('hsh-knowledge', reload)
+  }, [])
   const upsert = (it: KItem) => {
     const next = items.some(x => x.id === it.id) ? items.map(x => (x.id === it.id ? it : x)) : [...items, it]
     setItems(next); saveKnowledge(next, { upsert: it }).catch(e => { logError('Knowledge: saving', e); setErr(MIGRATION_HINT) })
@@ -42,11 +47,6 @@ export function Knowledge() {
   const make = (kind: KKind, f: Partial<KItem>): KItem => {
     const same = items.filter(x => x.kind === kind)
     return { id: `${kind}-${Date.now().toString(36)}`, kind, title: '', sub: '', cat: '', body: '', num: 0, num2: 0, sort: (same[same.length - 1]?.sort ?? 0) + 1, ...f }
-  }
-  const upsertMany = (list: KItem[]) => {
-    const ids = new Set(list.map(x => x.id))
-    const next = [...items.filter(x => !ids.has(x.id)), ...list]
-    setItems(next); saveKnowledge(next, { many: list }).catch(e => { logError('Knowledge: importing', e); setErr(MIGRATION_HINT) })
   }
   const of = (k: KKind) => items.filter(x => x.kind === k)
   // weekly practice bank
@@ -78,7 +78,7 @@ export function Knowledge() {
       </div>
       {err && <div style={{ fontSize: 14, color: 'var(--late)' }}>{err}</div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
-        <div style={show('books')}><Books books={of('book')} upsert={upsert} remove={remove} make={make} upsertMany={upsertMany} /></div>
+        <div style={show('books')}><Books books={of('book')} upsert={upsert} remove={remove} make={make} /></div>
         <div style={show('speaking')}><Scripts scripts={of('script')} upsert={upsert} remove={remove} make={make} bank={speeches} /></div>
         <div style={show('talk')}><SmallTalk bank={talks} /></div>
         <div style={show('facts')}><Facts bank={facts} /></div>
@@ -97,23 +97,8 @@ interface Ops { upsert: (i: KItem) => void; remove: (id: string) => void; make: 
 
 // ================= Books =================
 const STATUSES: [string, string][] = [['reading', 'Reading'], ['want', 'Want to read'], ['done', 'Finished']]
-function Books({ books, upsert, remove, make, upsertMany }: { books: KItem[]; upsertMany: (l: KItem[]) => void } & Ops) {
-  const file = useRef<HTMLInputElement>(null)
-  const [imp, setImp] = useState('')
-  const importCsv = async (f: File | undefined) => {
-    if (!f) return
-    const list = goodreadsBooks(await f.text())
-    if (!list.length) { setImp('That file does not look like a Goodreads export.'); return }
-    const key = (t: string, a: string) => (t + '|' + a).toLowerCase().trim()
-    const have = new Map(books.map(b => [key(b.title, b.sub), b]))
-    let added = 0, updated = 0; let sort = Math.max(0, ...books.map(b => b.sort))
-    const out: KItem[] = list.map((g, i) => {
-      const old = have.get(key(g.title, g.author))
-      if (old) { updated++; return { ...old, cat: g.status, num2: g.rating || old.num2, num: g.status === 'done' ? 100 : old.num, body: old.body || g.review } }
-      added++; return { id: `book-gr-${Date.now().toString(36)}-${i}`, kind: 'book', title: g.title, sub: g.author, cat: g.status, body: g.review, num: g.status === 'done' ? 100 : 0, num2: g.rating, sort: ++sort }
-    })
-    upsertMany(out); setImp(`Imported from Goodreads: ${added} new, ${updated} updated.`)
-  }
+function Books({ books, upsert, remove, make }: { books: KItem[] } & Ops) {
+
   const [tab, setTab] = useState('reading')
   const [title, setTitle] = useState(''); const [author, setAuthor] = useState('')
   const [open, setOpen] = useState<string | null>(null)
@@ -140,11 +125,6 @@ function Books({ books, upsert, remove, make, upsertMany }: { books: KItem[]; up
         <input type="text" placeholder="Author" value={author} onChange={e => setAuthor(e.target.value)} style={{ flex: '1 1 150px', minWidth: 0 }} />
         <button className="btn small" type="submit">Add book</button>
       </form>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn small outline" onClick={() => file.current?.click()}>Import from Goodreads</button>
-        <input ref={file} type="file" accept=".csv,text/csv" hidden onChange={e => { importCsv(e.target.files?.[0]); e.target.value = '' }} />
-        <span className="muted" style={{ fontSize: 13 }}>{imp || 'On goodreads.com: My Books → Import and export → Export library, then choose that file here.'}</span>
-      </div>
       {cur && <BookDialog key={cur.id} book={cur} onClose={() => setOpen(null)} onSave={upsert} onDelete={() => { if (confirm(`Delete "${cur.title}"?`)) { remove(cur.id); setOpen(null) } }} />}
     </div>
   )

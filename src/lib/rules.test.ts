@@ -189,3 +189,16 @@ import { goodreadsBooks, dailyIndex } from './ktext.ts'
   assert.ok(dailyIndex('2026-10-25', 'fact', 10) < 10)
   console.log('goodreads and bank tests passed')
 }
+
+import { parseGoodreadsRss } from './ktext.ts'
+{
+  const xml = `<rss><channel><item><title><![CDATA[Atomic Habits]]></title><author_name>James Clear</author_name><user_rating>5</user_rating><user_read_at><![CDATA[Mon, 01 Apr 2024]]></user_read_at><user_shelves></user_shelves><user_review><![CDATA[Loved it<br/>so good]]></user_review></item>
+<item><title>Deep Work</title><author_name>Cal Newport</author_name><user_rating>0</user_rating><user_read_at></user_read_at><user_shelves>currently-reading</user_shelves><user_review></user_review></item>
+<item><title>Dune &amp; More</title><author_name>Frank Herbert</author_name><user_rating>0</user_rating><user_read_at></user_read_at><user_shelves>to-read</user_shelves><user_review></user_review></item></channel></rss>`
+  const b = parseGoodreadsRss(xml)
+  assert.strictEqual(b.length, 3)
+  assert.deepStrictEqual([b[0].status, b[0].rating, b[0].review], ['done', 5, 'Loved it\nso good'])
+  assert.strictEqual(b[1].status, 'reading')
+  assert.deepStrictEqual([b[2].title, b[2].status], ['Dune & More', 'want'])
+  console.log('goodreads rss tests passed')
+}

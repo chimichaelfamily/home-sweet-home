@@ -110,3 +110,29 @@ export function dailyIndex(day: string, kind: string, n: number): number {
   let h = 0; for (const ch of day + kind) h = (h * 31 + ch.charCodeAt(0)) >>> 0
   return n ? h % n : 0
 }
+
+/** Reads a Goodreads shelf RSS feed (the RSS link at the bottom of My Books). */
+export function parseGoodreadsRss(xml: string): GrBook[] {
+  const tag = (block: string, name: string) => {
+    const m = block.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`))
+    if (!m) return ''
+    return m[1].replace(/^\s*<!\[CDATA\[/, '').replace(/\]\]>\s*$/, '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim()
+  }
+  const out: GrBook[] = []
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const b = m[1]
+    const shelves = tag(b, 'user_shelves').toLowerCase()
+    const readAt = tag(b, 'user_read_at')
+    const status: GrBook['status'] = shelves.includes('currently-reading') ? 'reading' : shelves.includes('to-read') ? 'want' : 'done'
+    out.push({
+      title: tag(b, 'title'),
+      author: tag(b, 'author_name'),
+      status: status === 'done' && !readAt && shelves && !shelves.includes('read') ? 'want' : status,
+      rating: Math.max(0, Math.min(5, Number(tag(b, 'user_rating')) || 0)),
+      review: tag(b, 'user_review').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim(),
+      dateRead: readAt,
+    })
+  }
+  return out.filter(x => x.title)
+}
