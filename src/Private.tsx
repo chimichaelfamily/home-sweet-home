@@ -231,10 +231,21 @@ function Adjust({ value, onChange, start }: { value: number; onChange: (v: numbe
 function Money({ rows, step, upsertMany, edit, add, upsert, remove }: { rows: PItem[]; step: number; upsertMany: (l: PItem[]) => void } & Ops) {
   const [n, setN] = useState(''); const [t, setT] = useState(''); const [y, setY] = useState(String(new Date().getFullYear() + 1)); const [sv, setSv] = useState('')
   const years = [...new Set(rows.map(r => r.cat))].sort()
-  /** Swap a goal with its neighbour (renumbers the group so the order always sticks). */
-  const move = (grp: PItem[], idx: number, dir: -1 | 1) => {
-    const order = [...grp]; const [it] = order.splice(idx, 1); order.splice(idx + dir, 0, it)
-    upsertMany(order.map((x, i) => ({ ...x, sort: i + 1 })))
+  /** Drag and drop (Edit mode): hold the ⠿ handle and slide the card up or down within its year. */
+  const cards = useRef(new Map<string, HTMLDivElement>())
+  const [drag, setDrag] = useState<{ id: string; yr: string; startY: number; mid: number; dy: number; over: number } | null>(null)
+  const groupOf = (yr: string) => rows.filter(r => r.cat === yr).sort((a, b) => a.sort - b.sort)
+  const overIndex = (yr: string, y: number, id: string) => {
+    const grp = groupOf(yr).filter(r => r.id !== id); let i = 0
+    for (const r of grp) { const el = cards.current.get(r.id); if (el) { const b = el.getBoundingClientRect(); if (y > b.top + b.height / 2) i++ } }
+    return i
+  }
+  const drop = () => {
+    if (!drag) return
+    const grp = groupOf(drag.yr); const from = grp.findIndex(r => r.id === drag.id)
+    const order = grp.filter(r => r.id !== drag.id); order.splice(drag.over, 0, grp[from])
+    setDrag(null)
+    if (order.some((x, i) => x.id !== grp[i].id)) upsertMany(order.map((x, i) => ({ ...x, sort: i + 1 })))
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -243,12 +254,18 @@ function Money({ rows, step, upsertMany, edit, add, upsert, remove }: { rows: PI
       {years.map(yr => (
         <div key={yr} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.5, marginTop: 6 }}>BY {yr}</div>
-          {rows.filter(r => r.cat === yr).sort((a, b) => a.sort - b.sort).map((r, idx, grp) => {
+          {groupOf(yr).map((r, idx) => {
             const pct = r.num2 > 0 ? Math.min(100, Math.round(r.num1 / r.num2 * 100)) : 0
             const left = Math.max(0, r.num2 - r.num1); const per = left / monthsTo(Number(yr))
             return (
-              <div key={r.id} className="card" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div key={r.id} ref={el => { if (el) cards.current.set(r.id, el); else cards.current.delete(r.id) }} className="card" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 6, position: 'relative',
+                ...(drag?.id === r.id ? { transform: `translateY(${drag.dy}px)`, zIndex: 5, boxShadow: '0 16px 40px rgba(0,0,0,.25)', opacity: .95 } : {}),
+                ...(drag && drag.yr === yr && drag.id !== r.id && (idx - (groupOf(yr).findIndex(x => x.id === drag.id) < idx ? 1 : 0)) === drag.over ? { borderTop: '3px solid var(--accent)' } : {}) }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  {edit && <span aria-label={`Drag ${r.title}`} role="button" style={{ touchAction: 'none', cursor: 'grab', fontSize: 26, lineHeight: 1, color: 'var(--muted)', padding: '6px 4px', userSelect: 'none' }}
+                    onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); const b = cards.current.get(r.id)!.getBoundingClientRect(); setDrag({ id: r.id, yr, startY: e.clientY, mid: b.top + b.height / 2, dy: 0, over: idx }) }}
+                    onPointerMove={e => { if (drag?.id === r.id) { const dy = e.clientY - drag.startY; setDrag({ ...drag, dy, over: overIndex(yr, drag.mid + dy, r.id) }) } }}
+                    onPointerUp={drop} onPointerCancel={() => setDrag(null)}>⠿</span>}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 20, fontWeight: 600 }}>{r.title}</div>
                     <div className="muted" style={{ fontSize: 15 }}>{money(r.num1)} of {money(r.num2)}</div>
@@ -266,8 +283,6 @@ function Money({ rows, step, upsertMany, edit, add, upsert, remove }: { rows: PI
                     <label style={{ width: 130 }}>Target $<input type="number" defaultValue={r.num2} onBlur={e => { const v = Number(e.target.value); if (v > 0 && v !== r.num2) upsert({ ...r, num2: v }) }} style={{ width: '100%' }} /></label>
                     <label style={{ width: 130 }}>Saved so far $<input type="number" aria-label="Saved so far" defaultValue={r.num1} onBlur={e => upsert({ ...r, num1: Number(e.target.value) || 0 })} style={{ width: '100%' }} /></label>
                     <label style={{ width: 110 }}>By Dec<input type="number" aria-label="By year" defaultValue={Number(r.cat)} onBlur={e => { const v = Math.round(Number(e.target.value)); if (v >= new Date().getFullYear() && v < 2100 && String(v) !== r.cat) upsert({ ...r, cat: String(v) }) }} style={{ width: '100%' }} /></label>
-                    <button className="btn small outline" aria-label="Move up" disabled={idx === 0} onClick={() => move(grp, idx, -1)} style={{ height: 30, width: 36, padding: 0 }}>↑</button>
-                    <button className="btn small outline" aria-label="Move down" disabled={idx === grp.length - 1} onClick={() => move(grp, idx, 1)} style={{ height: 30, width: 36, padding: 0 }}>↓</button>
                     <RM onClick={() => remove(r.id)} />
                   </div>)}
               </div>
