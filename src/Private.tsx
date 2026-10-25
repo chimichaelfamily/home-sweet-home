@@ -154,27 +154,33 @@ function Money({ rows, edit, add, upsert, remove }: { rows: PItem[] } & Ops) {
   const [n, setN] = useState(''); const [t, setT] = useState(''); const [y, setY] = useState(String(new Date().getFullYear() + 1)); const [sv, setSv] = useState('')
   const years = [...new Set(rows.map(r => r.cat))].sort()
   return (
-    <div className="card" style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 22, fontWeight: 600 }}>Money magic</div>
-      {rows.length === 0 && <div className="muted">Add a goal with its target and a year. The monthly amount works itself out.</div>}
+      {rows.length === 0 && <div className="card muted" style={{ padding: 20 }}>Add a goal with its target and a year. The monthly amount works itself out.</div>}
       {years.map(yr => (
-        <div key={yr}>
-          <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.5, margin: '10px 0 4px' }}>BY {yr}</div>
+        <div key={yr} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.5, marginTop: 6 }}>BY {yr}</div>
           {rows.filter(r => r.cat === yr).map(r => {
             const pct = r.num2 > 0 ? Math.min(100, Math.round(r.num1 / r.num2 * 100)) : 0
             const left = Math.max(0, r.num2 - r.num1); const per = left / monthsTo(Number(yr))
             return (
-              <div key={r.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 19, fontWeight: 600 }}><span>{r.title}</span><span>{money(r.num1)} of {money(r.num2)} · {pct}%</span></div>
-                <div style={{ height: 10, borderRadius: 10, background: 'var(--faint)', margin: '6px 0' }}><div style={{ height: 10, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
+              <div key={r.id} className="card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 20, fontWeight: 600 }}>{r.title}</div>
+                    <div className="muted" style={{ fontSize: 15 }}>{money(r.num1)} of {money(r.num2)}</div>
+                  </div>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--accent)' }}>{pct}%</div>
+                </div>
+                <div style={{ height: 12, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 12, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
                 <div className="muted" style={{ fontSize: 14 }}>{left > 0 ? `${money(per)} a month until Dec ${yr}` : 'Reached!'}</div>
-                {edit && <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}><label className="muted" style={{ fontSize: 13 }}>Saved so far</label><input type="number" aria-label="Saved so far" defaultValue={r.num1} onBlur={e => upsert({ ...r, num1: Number(e.target.value) || 0 })} style={{ width: 140 }} /><RM onClick={() => remove(r.id)} /></div>}
+                {edit && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><label className="muted" style={{ fontSize: 13 }}>Saved so far</label><input type="number" aria-label="Saved so far" defaultValue={r.num1} onBlur={e => upsert({ ...r, num1: Number(e.target.value) || 0 })} style={{ width: 140 }} /><RM onClick={() => remove(r.id)} /></div>}
               </div>
             )
           })}
         </div>
       ))}
-      {edit && <form style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }} onSubmit={e => { e.preventDefault(); if (n.trim() && Number(t) > 0) { add('money', { title: n.trim(), num2: Number(t), num1: Number(sv) || 0, cat: y }); setN(''); setT(''); setSv('') } }}>
+      {edit && <form className="card" style={{ display: 'flex', gap: 8, padding: 16, flexWrap: 'wrap' }} onSubmit={e => { e.preventDefault(); if (n.trim() && Number(t) > 0) { add('money', { title: n.trim(), num2: Number(t), num1: Number(sv) || 0, cat: y }); setN(''); setT(''); setSv('') } }}>
         <input type="text" placeholder="Goal name" value={n} onChange={e => setN(e.target.value)} style={{ flex: 2, minWidth: 180 }} />
         <input type="number" placeholder="Target $" value={t} onChange={e => setT(e.target.value)} style={{ width: 130 }} />
         <input type="number" placeholder="Saved $" value={sv} onChange={e => setSv(e.target.value)} style={{ width: 130 }} />
