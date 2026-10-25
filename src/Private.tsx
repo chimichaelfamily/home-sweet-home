@@ -87,6 +87,8 @@ const RM = ({ onClick }: { onClick: () => void }) => <button className="btn smal
 function Goals({ pillars, steps, tasks, onPush, demo, edit, add, upsert, remove }: { pillars: PItem[]; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string; demo: boolean } & Ops) {
   const [pt, setPt] = useState('')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [openGoals, setOpenGoals] = useState<Set<string>>(new Set())
+  const [showDone, setShowDone] = useState<Set<string>>(new Set())
   const taskOf = (st: PItem) => (st.sub.startsWith('task:') ? tasks.find(t => t.id === st.sub.slice(5)) : undefined)
   const isDone = (st: PItem) => st.num1 === 1 || !!taskOf(st)?.done_at
   const inTodo = (st: PItem) => { if (demo) return st.sub.startsWith('task:'); const t = taskOf(st); return !!t && !t.done_at }
@@ -110,22 +112,42 @@ function Goals({ pillars, steps, tasks, onPush, demo, edit, add, upsert, remove 
             </div>
             <div style={{ height: 12, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 12, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
             {edit && mine.length === 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><label className="muted" style={{ fontSize: 13 }}>Progress %</label><input type="number" min={0} max={100} aria-label="Percent" defaultValue={p.num1} onBlur={e => upsert({ ...p, num1: Math.min(100, Number(e.target.value) || 0) })} style={{ width: 100 }} /></div>}
-            {mine.map(st => {
-              const d = isDone(st); const t = inTodo(st)
+            {(() => {
+              const isOpen = openGoals.has(p.id); const todo = mine.filter(x => !isDone(x)); const doneSteps = mine.filter(isDone); const nextStep = todo[0]
+              const toggle = () => { const n = new Set(openGoals); if (isOpen) n.delete(p.id); else n.add(p.id); setOpenGoals(n) }
+              const stepRow = (st: PItem) => {
+                const d = isDone(st); const t = inTodo(st)
+                return (
+                  <div key={st.id} className="row" style={{ minHeight: 40, gap: 10 }}>
+                    <button className={'circle' + (d ? ' done' : '')} aria-label={d ? `Mark "${st.title}" not done` : `Mark "${st.title}" done`} style={{ width: 22, height: 22 }} onClick={() => upsert({ ...st, num1: d ? 0 : 1 })}>{d && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7" /></svg>}</button>
+                    <div style={{ flex: 1, fontSize: 15, ...(d ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{st.title}</div>
+                    {!d && (t ? <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>In To do</span>
+                      : <button className="btn small outline" style={{ height: 30, fontSize: 12, padding: '0 10px' }} onClick={() => { const id = onPush(st.title); upsert({ ...st, sub: 'task:' + id }) }}>+ To do</button>)}
+                    {edit && <RM onClick={() => remove(st.id)} />}
+                  </div>
+                )
+              }
               return (
-                <div key={st.id} className="row" style={{ minHeight: 48 }}>
-                  <button className={'circle' + (d ? ' done' : '')} aria-label={d ? `Mark "${st.title}" not done` : `Mark "${st.title}" done`} style={{ width: 28, height: 28 }} onClick={() => upsert({ ...st, num1: d ? 0 : 1 })}>{d && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7" /></svg>}</button>
-                  <div style={{ flex: 1, fontSize: 17, ...(d ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{st.title}</div>
-                  {!d && (t ? <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>In To do</span>
-                    : <button className="btn small outline" style={{ height: 36, fontSize: 14 }} onClick={() => { const id = onPush(st.title); upsert({ ...st, sub: 'task:' + id }) }}>+ To do</button>)}
-                  {edit && <RM onClick={() => remove(st.id)} />}
-                </div>
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    {nextStep && !isOpen && <div className="muted" style={{ flex: 1, minWidth: 0, fontSize: 14 }}>Next: {nextStep.title}</div>}
+                    {!nextStep && !isOpen && <div style={{ flex: 1 }} />}
+                    {isOpen && <div style={{ flex: 1 }} />}
+                    <button onClick={toggle} style={{ border: 'none', background: 'none', padding: 0, fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>{isOpen ? 'Hide steps' : mine.length ? `Steps (${mine.length})` : 'Add steps'}</button>
+                  </div>
+                  {isOpen && (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {todo.map(stepRow)}
+                      {doneSteps.length > 0 && <button onClick={() => { const n = new Set(showDone); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); setShowDone(n) }} style={{ alignSelf: 'flex-start', border: 'none', background: 'none', padding: '8px 0', fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>{showDone.has(p.id) ? 'Hide done' : `Show done (${doneSteps.length})`}</button>}
+                      {showDone.has(p.id) && doneSteps.map(stepRow)}
+                      <form style={{ display: 'flex', gap: 6, marginTop: 6 }} onSubmit={e => { e.preventDefault(); const v = draft.trim(); if (v) { add('step', { title: v, cat: p.id, sort: (mine[mine.length - 1]?.sort ?? 0) + 1 }); setDrafts({ ...drafts, [p.id]: '' }) } }}>
+                        <input type="text" placeholder="Add a step" value={draft} onChange={e => setDrafts({ ...drafts, [p.id]: e.target.value })} style={{ flex: 1, minWidth: 0, height: 38, fontSize: 15, padding: '0 12px', borderRadius: 12 }} />
+                        <button className="btn small" type="submit" style={{ height: 38, fontSize: 13, padding: '0 14px' }}>Add</button>
+                      </form>
+                    </div>)}
+                </>
               )
-            })}
-            <form style={{ display: 'flex', gap: 8 }} onSubmit={e => { e.preventDefault(); const v = draft.trim(); if (v) { add('step', { title: v, cat: p.id, sort: (mine[mine.length - 1]?.sort ?? 0) + 1 }); setDrafts({ ...drafts, [p.id]: '' }) } }}>
-              <input type="text" placeholder="Add a step, e.g. Book tickets" value={draft} onChange={e => setDrafts({ ...drafts, [p.id]: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
-              <button className="btn small" type="submit">Add step</button>
-            </form>
+            })()}
             {edit && <div><RM onClick={() => { if (confirm(`Remove "${p.title}" and its steps?`)) { mine.forEach(x => remove(x.id)); remove(p.id) } }} /></div>}
           </div>
         )
