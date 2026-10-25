@@ -50,6 +50,18 @@ export function PhotoPicker({ initial = '', onPick, onClose }: { initial?: strin
 }
 
 /** Small photographer credit for Unsplash photos (credit string is "name|link"). */
+/** A small ⓘ in the corner; tap it to see who took the photo (Unsplash asks for credit). */
+export function CreditDot({ credit }: { credit?: string }) {
+  const [open, setOpen] = useState(false)
+  if (!credit || !credit.includes('|')) return null
+  return (
+    <div style={{ position: 'absolute', right: 12, bottom: 10, display: 'flex', alignItems: 'center', gap: 6, zIndex: 2 }}>
+      {open && <div style={{ background: 'rgba(0,0,0,.55)', borderRadius: 10, padding: '4px 8px' }}><Credit credit={credit} /></div>}
+      <button aria-label="Photo credit" onClick={() => setOpen(!open)} style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid rgba(255,255,255,.6)', background: 'rgba(0,0,0,.25)', color: '#fff', fontSize: 12, fontWeight: 700, padding: 0, opacity: .7 }}>i</button>
+    </div>
+  )
+}
+
 export function Credit({ credit }: { credit?: string }) {
   if (!credit || !credit.includes('|')) return null
   const [by, link] = credit.split('|')

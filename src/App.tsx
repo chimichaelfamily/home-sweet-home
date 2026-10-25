@@ -3,7 +3,7 @@ import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, 
 import { Private } from './Private.tsx'
 import { Ask } from './Ask.tsx'
 import { MonthCalendar } from './MonthCalendar.tsx'
-import { Credit, PhotoPicker } from './PhotoPicker.tsx'
+import { CreditDot, PhotoPicker } from './PhotoPicker.tsx'
 import { Face, FaceSettings, refreshAvatars } from './Face.tsx'
 import { WeatherScene } from './WeatherScene.tsx'
 import { skyOf } from './lib/photos.ts'
@@ -534,11 +534,11 @@ function Morning() {
       </div>
       <div className="scroll" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 20 }}>
         <div className="cols" style={{ display: 'flex', gap: 14, alignItems: 'stretch', flex: 'none' }}>
-        <div className="aff-card" style={{ flex: 1.3, minWidth: 0, minHeight: 360, borderRadius: 28, padding: 28, display: 'flex', flexDirection: 'column', gap: 14, color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,.35)', background: cur?.img ? `linear-gradient(rgba(20,12,30,.35),rgba(20,12,30,.55)), center / cover url("${cur.img}")` : 'linear-gradient(135deg,var(--accent),var(--g2))' }}>
+        <div className="aff-card" style={{ position: 'relative', flex: 1.3, minWidth: 0, minHeight: 360, borderRadius: 28, padding: 28, display: 'flex', flexDirection: 'column', gap: 14, color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,.35)', background: cur?.img ? `linear-gradient(rgba(20,12,30,.35),rgba(20,12,30,.55)), center / cover url("${cur.img}")` : 'linear-gradient(135deg,var(--accent),var(--g2))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 600, letterSpacing: 1.5 }}><span>1 · READ YOUR AFFIRMATIONS</span><span>{aff.length ? `${Math.min(i, aff.length - 1) + 1} of ${aff.length}` : ''}</span></div>
           {!edit && <>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', fontSize: 36, fontWeight: 600, lineHeight: 1.2 }}>{cur ? cur.title : 'No affirmations yet. Tap Edit to add some.'}</div>
-            {cur?.img && <Credit credit={cur.sub} />}
+            {cur?.img && <CreditDot credit={cur.sub} />}
             <div style={{ display: 'flex', gap: 8 }}>{aff.map((_, k) => <div key={k} style={{ flex: 1, height: 6, borderRadius: 6, background: k <= i ? '#fff' : 'rgba(255,255,255,.35)' }} />)}</div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn" style={{ minWidth: 120, background: 'rgba(20,12,30,.78)', border: '2px solid #fff', color: '#fff', textShadow: 'none', fontWeight: 700, opacity: i === 0 ? .55 : 1 }} disabled={i === 0} onClick={() => setI(i - 1)}>Back</button>
