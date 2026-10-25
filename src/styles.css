@@ -116,3 +116,68 @@ html[data-mode='dark'] .toast { background: #F2EDF9; color: #201C2B; }
 
 .todo-card .row { min-height: 46px; }
 .todo-card .circle { width: 28px; height: 28px; }
+
+/* iPhone and other small screens */
+@media (max-width: 640px) {
+  html, body, #root { height: 100dvh; }
+  .app { height: 100dvh; padding: calc(10px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
+  .card { border-radius: 22px; }
+  .nav { height: 52px; }
+  .nav button { height: 44px; padding: 0 14px; font-size: 15px; }
+  .btn { height: 50px; padding: 0 22px; font-size: 17px; }
+  .btn.small { height: 40px; padding: 0 14px; font-size: 14px; }
+  input[type=text], input[type=password], input[type=email], input[type=date], input[type=number], select, textarea { height: 50px; font-size: 17px; }
+  .dialog { width: min(94vw, 480px) !important; padding: 20px; border-radius: 24px; max-height: 92dvh; overflow-y: auto; }
+  .overlay { align-items: flex-end; padding-bottom: 8px; }
+  .overlay .dialog { align-self: center; }
+  [style*="font-size: 36px"] { font-size: 28px !important; }
+
+  /* Home: to-do first, then weather, schedule, habits */
+  .cols.rev { flex-direction: column !important; }
+  .todo-card { height: auto !important; min-height: 320px; padding: 18px !important; }
+  .todo-card .scroll { overflow: visible; }
+  .wx-card { height: auto; min-height: 104px; padding: 14px 18px; }
+
+  /* Calendar */
+  .mc-head { flex-wrap: wrap; gap: 8px !important; }
+  .mc-title { font-size: 26px !important; }
+  .mc-month { font-size: 18px !important; min-width: 0 !important; flex: none; white-space: nowrap; text-align: center; }
+  .mc-cell { min-height: 54px !important; padding: 4px 4px !important; border-radius: 12px !important; }
+  .mc-date { font-size: 15px !important; padding: 1px 6px !important; }
+  .mc-lunar { font-size: 10px !important; right: 4px !important; bottom: 3px !important; }
+  .mc-tet { right: 3px !important; top: 3px !important; }
+  .mc-tet svg, .mc-tet img { width: 18px !important; height: 18px !important; }
+  .mc-tet span { font-size: 14px !important; }
+  .mc-veg { left: 4px !important; bottom: 2px !important; }
+  .mc-veg svg, .mc-veg img { width: 16px !important; height: 16px !important; }
+  .mc-veg span { font-size: 13px !important; }
+  .mc-hol { font-size: 8px !important; line-height: 1.1 !important; margin-top: 1px !important; }
+
+  /* Points: face and score on the first line, the track on its own line */
+  .lane { flex-wrap: wrap; height: auto !important; gap: 8px 12px !important; }
+  .lane-face > span { width: 48px !important; height: 48px !important; }
+  .lane-score { order: 2; flex: 1 1 auto !important; width: auto !important; }
+  .lane-track { order: 3; flex: 1 1 100% !important; }
+
+  /* Habits: the month grid scrolls sideways */
+  .h-stats { gap: 8px !important; }
+  .h-stats .card { padding: 10px 12px !important; }
+  .h-stats .card > div:last-child { font-size: 22px !important; }
+  .habit-grid { --hc: 104px; --hd: 24px; --hs: 56px; min-width: max-content; }
+  .habit-grid .h-name { position: sticky; left: 0; z-index: 2; background: var(--card); font-size: 14px !important; padding: 4px 6px 4px 0; line-height: 1.15; }
+  .card.scroll:has(.habit-grid) { overflow-x: auto; }
+
+  /* Reminders: name on its own line, buttons underneath */
+  .rem { flex-wrap: wrap; padding: 8px 0; gap: 6px 10px !important; }
+  .rem-name { flex: 1 1 100% !important; font-size: 18px !important; }
+  .rem-when { width: auto !important; flex: 1; font-size: 14px !important; }
+
+  /* Report */
+  .r-row { flex-direction: column !important; gap: 12px !important; }
+
+  /* Settings */
+  .side { padding: 8px !important; flex-direction: row !important; flex-wrap: nowrap !important; overflow-x: auto; gap: 4px !important; }
+  .side > button { flex: none; min-height: 44px !important; font-size: 16px !important; padding: 0 14px !important; }
+  .theme-row { flex-direction: column !important; }
+  .cols > .card.scroll { padding: 16px !important; }
+}

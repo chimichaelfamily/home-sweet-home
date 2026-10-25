@@ -35,7 +35,7 @@ export function Private() {
         <div style={{ fontSize: 34, fontWeight: 600 }}>Goals</div>
         <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Goals, vision board and money. Locked with Face ID, and it locks itself after 2 minutes.</div>
         {!lockSupported() && <div style={{ fontSize: 15 }}>This browser does not support Face ID passkeys. Open the app from the Home Screen icon in Safari.</div>}
-        {lockSupported() && !registered && <button className="btn" onClick={() => go(true)}>Set up Face ID for this iPad</button>}
+        {lockSupported() && !registered && <button className="btn" onClick={() => go(true)}>Set up Face ID for this device</button>}
         {lockSupported() && registered && <button className="btn" onClick={() => go(false)}>Unlock with Face ID</button>}
         {msg && <div style={{ fontSize: 15 }}>{msg}</div>}
         {registered && <button className="btn small outline" onClick={() => { lockReset(); setRegistered(false) }}>Reset the lock</button>}

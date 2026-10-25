@@ -24,10 +24,10 @@ export function MonthCalendar() {
   const cells = Array.from({ length: rows * 7 }, (_, i) => { const d = i - lead + 1; return d >= 1 && d <= count ? d : 0 })
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ fontSize: 36, fontWeight: 600 }}>Calendar</div>
+      <div className="mc-head" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="mc-title" style={{ fontSize: 36, fontWeight: 600 }}>Calendar</div>
         <button className="btn small outline" aria-label="Previous month" onClick={() => setMonth(addMonthKey(month, -1))}>‹</button>
-        <div style={{ fontSize: 22, fontWeight: 600, minWidth: 170, textAlign: 'center' }}>{monthLabel(month)}</div>
+        <div style={{ fontSize: 22, fontWeight: 600, minWidth: 170, textAlign: 'center' }} className="mc-month">{monthLabel(month)}</div>
         <button className="btn small outline" aria-label="Next month" onClick={() => setMonth(addMonthKey(month, 1))}>›</button>
         <div style={{ flex: 1 }} />
         {month !== t.slice(0, 7) && <button className="btn small" onClick={() => setMonth(t.slice(0, 7))}>Today</button>}
@@ -52,12 +52,12 @@ export function MonthCalendar() {
             const holiday = hol[ymd]
             const bg = tet ? 'rgba(214,38,43,.16)' : holiday ? 'rgba(59,130,246,.15)' : weekend ? 'var(--faint)' : 'transparent'
             return (
-              <div key={i} style={{ position: 'relative', minHeight: 70, borderRadius: 16, border: `1.5px solid ${isToday ? 'var(--accent)' : tet ? 'rgba(214,38,43,.55)' : 'var(--border)'}`, background: bg, padding: '8px 10px', overflow: 'hidden' }}>
-                <span style={{ fontSize: 20, fontWeight: isToday ? 700 : 500, ...(isToday ? { background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: 999, padding: '2px 9px' } : {}) }}>{d}</span>
-                {tet && <span style={{ position: 'absolute', right: 8, top: 6 }}><IconView value={icons.tet} size={30} /></span>}
-                {holiday && <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, marginTop: 3, color: 'var(--blue-tx)' }}>{holiday}</div>}
-                {veg && <span style={{ position: 'absolute', left: 9, bottom: 5 }}><IconView value={icons.veg} size={26} /></span>}
-                <span className="muted" style={{ position: 'absolute', right: 10, bottom: 6, fontSize: 12, fontWeight: l.day === 1 ? 700 : 400 }}>{label}</span>
+              <div key={i} className="mc-cell" style={{ position: 'relative', minHeight: 70, borderRadius: 16, border: `1.5px solid ${isToday ? 'var(--accent)' : tet ? 'rgba(214,38,43,.55)' : 'var(--border)'}`, background: bg, padding: '8px 10px', overflow: 'hidden' }}>
+                <span className="mc-date" style={{ fontSize: 20, fontWeight: isToday ? 700 : 500, ...(isToday ? { background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: 999, padding: '2px 9px' } : {}) }}>{d}</span>
+                {tet && <span className="mc-tet" style={{ position: 'absolute', right: 8, top: 6 }}><IconView value={icons.tet} size={30} /></span>}
+                {holiday && <div className="mc-hol" style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, marginTop: 3, color: 'var(--blue-tx)' }}>{holiday}</div>}
+                {veg && <span className="mc-veg" style={{ position: 'absolute', left: 9, bottom: 5 }}><IconView value={icons.veg} size={26} /></span>}
+                <span className="muted mc-lunar" style={{ position: 'absolute', right: 10, bottom: 6, fontSize: 12, fontWeight: l.day === 1 ? 700 : 400 }}>{label}</span>
               </div>
             )
           })}

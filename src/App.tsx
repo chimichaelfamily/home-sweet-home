@@ -223,23 +223,25 @@ function Habits({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
   for (let d = 1; d <= elapsed; d++) { const c = sets.filter(x => x.has(dayKey(d))).length; doneTotal += c; if (hs.length && c === hs.length) perfect++ }
   const pct = elapsed && hs.length ? Math.round((doneTotal / (elapsed * hs.length)) * 100) : 0
   const best = Math.max(0, ...sets.map(x => longestInMonth(x, month, t)))
+  const gridCard = useRef<HTMLDivElement>(null)
+  useEffect(() => { const el = gridCard.current; if (el && window.innerWidth <= 640) el.scrollLeft = month === t.slice(0, 7) ? Math.max(0, (Number(t.slice(8, 10)) - 4) * 26) : 0 }, [month, t])
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div className="mc-head" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Habits</div>
         <button className="btn small outline" aria-label="Previous month" onClick={() => setMonth(addMonthKey(month, -1))}>‹</button>
-        <div style={{ fontSize: 22, fontWeight: 600, minWidth: 170, textAlign: 'center' }}>{monthLabel(month)}</div>
+        <div className="mc-month" style={{ fontSize: 22, fontWeight: 600, minWidth: 170, textAlign: 'center' }}>{monthLabel(month)}</div>
         <button className="btn small outline" aria-label="Next month" onClick={() => setMonth(addMonthKey(month, 1))}>›</button>
         <div style={{ flex: 1 }} /><PersonToggle who={who} setWho={setWho} />
       </div>
-      <div style={{ display: 'flex', gap: 14 }}>
+      <div className="h-stats" style={{ display: 'flex', gap: 14 }}>
         {[['Longest streak', `${best} days`], ['Perfect days', `${perfect} of ${elapsed}`], ['Done', `${pct}%`]].map(([a, b]) => (
           <div key={a} className="card" style={{ flex: 1, padding: '14px 22px' }}><div className="muted" style={{ fontSize: 14, fontWeight: 600 }}>{a}</div><div style={{ fontSize: 30, fontWeight: 600 }}>{b}</div></div>
         ))}
       </div>
-      <div className="card scroll" style={{ flex: 1, padding: '14px 24px' }}>
+      <div ref={gridCard} className="card scroll" style={{ flex: 1, padding: '14px 24px' }}>
         {hs.length === 0 && <div className="muted" style={{ padding: 16, fontSize: 17 }}>No habits yet. Add some in Settings.</div>}
-        <div style={{ display: 'grid', gridTemplateColumns: `170px repeat(${n}, 1fr) 100px`, alignItems: 'center', rowGap: 4 }}>
+        <div className="habit-grid" style={{ display: 'grid', gridTemplateColumns: `var(--hc, 170px) repeat(${n}, minmax(var(--hd, 0px), 1fr)) var(--hs, 100px)`, alignItems: 'center', rowGap: 4 }}>
           <div />{Array.from({ length: n }, (_, i) => { const isT = dayKey(i + 1) === t; return <div key={i} className={isT ? '' : 'muted'} style={{ fontSize: isT ? 15 : 11, textAlign: 'center', ...(isT ? { fontWeight: 800, color: 'var(--accent)' } : {}) }}>{i + 1}</div> })}<div className="muted" style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>STREAK</div>
           {hs.map((h, hi) => (
             <HabitRow key={h.id} name={h.name} n={n} done={sets[hi]} dayKey={dayKey} today={t} streakN={streak(sets[hi], t)} onToggle={d => apply(A.toggleHabit(s, h.id, dayKey(d)))} />
@@ -252,7 +254,7 @@ function Habits({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
 function HabitRow({ name, n, done, dayKey, today: t, streakN, onToggle }: { name: string; n: number; done: Set<string>; dayKey: (d: number) => string; today: string; streakN: number; onToggle: (d: number) => void }) {
   return (
     <>
-      <div style={{ fontSize: 18, fontWeight: 600 }}>{name}</div>
+      <div className="h-name" style={{ fontSize: 18, fontWeight: 600 }}>{name}</div>
       {Array.from({ length: n }, (_, i) => {
         const k = dayKey(i + 1); const on = done.has(k); const future = k > t
         return <button key={i} aria-label={`${name} day ${i + 1}`} aria-pressed={on} disabled={future} onClick={() => onToggle(i + 1)} style={{ height: 36, border: 'none', background: 'transparent', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -651,9 +653,9 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
   const row = (r: Rule, isOver: boolean) => {
     const due = nextDue(r)!
     return (
-      <div className="row" key={r.id} style={{ minHeight: 62, position: 'relative' }}>
-        <div style={{ flex: 1, minWidth: 0, fontSize: 20, fontWeight: 500 }}>{r.name}</div>
-        <div style={{ width: 170, fontSize: 16, fontWeight: 500, color: isOver ? 'var(--late)' : 'var(--muted)' }}>{isOver ? `${daysLate(r, t)} days late` : fmtLong(due)}</div>
+      <div className="row rem" key={r.id} style={{ minHeight: 62, position: 'relative' }}>
+        <div className="rem-name" style={{ flex: 1, minWidth: 0, fontSize: 20, fontWeight: 500 }}>{r.name}</div>
+        <div className="rem-when" style={{ width: 170, fontSize: 16, fontWeight: 500, color: isOver ? 'var(--late)' : 'var(--muted)' }}>{isOver ? `${daysLate(r, t)} days late` : fmtLong(due)}</div>
         {isOver && <button className="btn small outline" onClick={() => { setPick(''); setMenu(menu === r.id ? null : r.id) }}>Snooze</button>}
         <button className="btn small" onClick={() => onDone({ kind: 'rule', id: r.id, title: r.name, size: r.size })}>Done</button>
         {menu === r.id && (
@@ -686,9 +688,9 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
           <>
             <div className="head" style={{ margin: '22px 0 2px' }}>SNOOZED</div>
             {snoozed.map(r => (
-              <div className="row" key={r.id} style={{ minHeight: 62 }}>
-                <div style={{ flex: 1, fontSize: 20, fontWeight: 500 }}>{r.name}</div>
-                <div className="muted" style={{ width: 170, fontSize: 16 }}>back {fmtLong(snoozedUntil(r.id)!)}</div>
+              <div className="row rem" key={r.id} style={{ minHeight: 62 }}>
+                <div className="rem-name" style={{ flex: 1, fontSize: 20, fontWeight: 500 }}>{r.name}</div>
+                <div className="muted rem-when" style={{ width: 170, fontSize: 16 }}>back {fmtLong(snoozedUntil(r.id)!)}</div>
                 <button className="btn small outline" onClick={() => apply(A.unsnooze(s, r.id))}>Undo snooze</button>
               </div>
             ))}
@@ -707,10 +709,10 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
   const Lane = ({ who }: { who: 'linh' | 'michael' }) => {
     const pts = tot[who]; const frac = Math.min(pts, 100) / 100; const me = who === 'linh'; const color = me ? 'var(--accent)' : 'var(--blue-bd)'
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 18, height: 84 }}>
-        <Face who={who} size={72} />
+      <div className="lane" style={{ display: 'flex', alignItems: 'center', gap: 18, height: 84 }}>
+        <span className="lane-face"><Face who={who} size={72} /></span>
         
-        <div style={{ flex: 1, position: 'relative', height: 60 }}>
+        <div className="lane-track" style={{ flex: 1, position: 'relative', height: 60 }}>
           <div style={{ position: 'absolute', left: 0, right: 0, top: 16, height: 32, borderRadius: 16, background: '#3A3A3E', boxShadow: 'inset 0 2px 6px rgba(0,0,0,.4)' }} />
           <div style={{ position: 'absolute', left: 16, right: 56, top: 31, height: 3, backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,.75) 0 14px, transparent 14px 28px)' }} />
           <div style={{ position: 'absolute', left: 16, top: 30, height: 5, borderRadius: 3, width: `calc((100% - 106px) * ${frac} + 40px)`, background: color }} />
@@ -732,7 +734,7 @@ function Points({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }
             <div style={{ width: 5, height: 12, background: '#2B2B2A' }} />
           </div>
         </div>
-        <div style={{ width: 120, textAlign: 'right', flex: 'none' }}><span style={{ fontSize: 44, fontWeight: 600, letterSpacing: -1 }}>{pts}</span><span className="muted" style={{ fontSize: 16 }}> / 100</span></div>
+        <div className="lane-score" style={{ width: 120, textAlign: 'right', flex: 'none' }}><span style={{ fontSize: 44, fontWeight: 600, letterSpacing: -1 }}>{pts}</span><span className="muted" style={{ fontSize: 16 }}> / 100</span></div>
       </div>
     )
   }
@@ -828,7 +830,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
                 <span style={{ fontWeight: 600, fontSize: 17 }}>Brightness</span>
                 {([['light', 'Light'], ['dark', 'Dark'], ['auto', 'Dark after sunset']] as const).map(([k, l]) => <button key={k} aria-pressed={mode === k} onClick={() => setMode(k)} style={{ height: 44, padding: '0 18px', borderRadius: 999, fontWeight: 600, fontSize: 16, border: '1.5px solid var(--mborder)', background: mode === k ? 'var(--accent)' : 'transparent', color: mode === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
               </div>
-              <div style={{ display: 'flex', gap: 14 }}>
+              <div className="theme-row" style={{ display: 'flex', gap: 14 }}>
                 {THEMES.map(th => (
                   <button key={th.id} onClick={() => setTheme(th.id)} aria-pressed={theme === th.id} data-theme={th.id} style={{ flex: 1, borderRadius: 22, padding: 12, textAlign: 'left', background: 'var(--card)', border: theme === th.id ? '2.5px solid var(--accent)' : '1.5px solid var(--border)', color: 'var(--ink)' }}>
                     <div style={{ height: 120, borderRadius: 14, background: 'var(--ground)', padding: 10, display: 'flex', gap: 8 }}>
@@ -893,7 +895,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
               <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Downloads everything (tasks, points, rules, habits, morning, private goals and money, products, weekly notes) as one file. Save it somewhere safe, like iCloud Drive. Do this about once a month.</div>
               <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={download}>Download backup</button>
               <div className="muted" style={{ fontSize: 15 }}>{bk ? `Last backup: ${bk}` : 'No backup yet.'} The backup file contains your private goals and money, so keep it private.</div>
-              {!usingDatabase && <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset demo data on this iPad?')) { try { localStorage.removeItem('home-sweet-home.v1') } catch { /* ignore */ } apply({ state: emptyState(), ops: [] }) } }}>Reset demo data</button>}
+              {!usingDatabase && <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset demo data on this device?')) { try { localStorage.removeItem('home-sweet-home.v1') } catch { /* ignore */ } apply({ state: emptyState(), ops: [] }) } }}>Reset demo data</button>}
             </div>
           )}
         </div>

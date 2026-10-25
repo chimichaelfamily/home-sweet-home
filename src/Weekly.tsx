@@ -106,7 +106,7 @@ ${withGoals ? goalsText() : ''}`
         <button className="btn small outline" aria-label="Later week" disabled={offset === 0} onClick={() => setOffset(offset - 1)}>›</button>
       </div>
       <div className="scroll" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 12 }}><Tile who="linh" p={L} /><Tile who="michael" p={M} /></div>
+        <div className="r-row" style={{ display: 'flex', gap: 12 }}><Tile who="linh" p={L} /><Tile who="michael" p={M} /></div>
         <div className="card" style={{ padding: 18 }}>
           <div style={{ display: 'flex', height: 18, borderRadius: 9, overflow: 'hidden', background: 'var(--ground)' }}>
             <div style={{ width: `${(L.points / total) * 100}%`, background: COL.linh }} />
@@ -129,9 +129,9 @@ ${withGoals ? goalsText() : ''}`
         </div>
         <div className="card" style={{ padding: 18 }}>
           <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10 }}>Habits this week</div>
-          <div style={{ display: 'flex', gap: 28 }}><Grid who="linh" p={L} /><Grid who="michael" p={M} /></div>
+          <div className="r-row" style={{ display: 'flex', gap: 28 }}><Grid who="linh" p={L} /><Grid who="michael" p={M} /></div>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div className="r-row" style={{ display: 'flex', gap: 12 }}>
           <div className="card" style={{ flex: 1, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}><span style={{ fontSize: 40, fontWeight: 700, color: w.overdue.length ? 'var(--late)' : 'var(--ink)' }}>{w.overdue.length}</span><span style={{ fontSize: 17, fontWeight: 600 }}>overdue</span></div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>{w.overdue.slice(0, 6).map(n => <Chip key={n} late>{n}</Chip>)}{w.overdue.length > 6 && <Chip>+{w.overdue.length - 6}</Chip>}</div>
