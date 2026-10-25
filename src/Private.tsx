@@ -35,7 +35,7 @@ export function Private({ tasks, onPush }: { tasks: Task[]; onPush: (title: stri
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="card" style={{ width: 520, padding: 36, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ fontSize: 34, fontWeight: 600 }}>Goals</div>
-        <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Goals, vision board and money. Locked with Face ID, and it locks itself after 2 minutes.</div>
+        <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Goals, vision board and money.</div>
         {!lockSupported() && <div style={{ fontSize: 15 }}>This browser does not support Face ID passkeys. Open the app from the Home Screen icon in Safari.</div>}
         {lockSupported() && !registered && <button className="btn" onClick={() => go(true)}>Set up Face ID for this device</button>}
         {lockSupported() && registered && <button className="btn" onClick={() => go(false)}>Unlock with Face ID</button>}
