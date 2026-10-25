@@ -17,3 +17,25 @@ export function embedUrl(link: string): { kind: 'youtube' | 'spotify'; src: stri
   }
   return null
 }
+
+/** The YouTube video id of a link, or null (playlists and other sites return null). */
+export function youtubeId(link: string): string | null {
+  let u: URL
+  try { u = new URL(link.trim()) } catch { return null }
+  const h = u.hostname.replace(/^www\.|^m\./, '')
+  if (h === 'youtu.be') return u.pathname.slice(1).split('/')[0] || null
+  if (h === 'youtube.com' || h === 'music.youtube.com') return u.searchParams.get('v') || (/^\/(shorts|embed|live)\//.test(u.pathname) ? u.pathname.split('/')[2] : null) || null
+  return null
+}
+
+/** Player address for the media dock. Songs after the first play on automatically (YouTube only). */
+export function playerSrc(link: string, then: string[] = []): { kind: 'youtube' | 'spotify'; src: string } | null {
+  const id = youtubeId(link)
+  if (id) {
+    const rest = then.map(youtubeId).filter((x): x is string => !!x && x !== id)
+    return { kind: 'youtube', src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&playsinline=1&rel=0&enablejsapi=1${rest.length ? '&playlist=' + rest.join(',') : ''}` }
+  }
+  const e = embedUrl(link)
+  if (!e) return null
+  return { kind: e.kind, src: e.kind === 'youtube' ? e.src + '&autoplay=1&enablejsapi=1' : e.src }
+}

@@ -202,3 +202,13 @@ import { parseGoodreadsRss } from './ktext.ts'
   assert.deepStrictEqual([b[2].title, b[2].status], ['Dune & More', 'want'])
   console.log('goodreads rss tests passed')
 }
+
+import { playerSrc, youtubeId } from './embed.ts'
+{
+  assert.strictEqual(youtubeId('https://youtu.be/abc123'), 'abc123')
+  assert.strictEqual(youtubeId('https://www.youtube.com/watch?v=xyz789&t=4'), 'xyz789')
+  assert.strictEqual(youtubeId('https://open.spotify.com/track/1'), null)
+  const p = playerSrc('https://youtu.be/a1', ['https://youtu.be/a1', 'https://www.youtube.com/watch?v=b2', 'https://youtu.be/c3'])!
+  assert.ok(p.src.includes('/embed/a1?') && p.src.includes('playlist=b2,c3') && p.src.includes('enablejsapi=1'))
+  console.log('media tests passed')
+}

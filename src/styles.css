@@ -195,3 +195,6 @@ html[data-mode='dark'] .toast { background: #F2EDF9; color: #201C2B; }
 @media (max-width: 760px) { .anchor-cards { grid-template-columns: 1fr; } .anchor-card { padding: 12px 16px; min-height: 72px; } .anchor-text { font-size: 17px; } }
 @media (max-width: 640px) { .sub-tabs { order: 5; flex: 1 1 100%; overflow-x: auto; } .sub-tabs button { flex: none; white-space: nowrap; } }
 textarea { height: auto !important; min-height: 120px; padding: 12px 14px; line-height: 1.5; }
+.dock-card { border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,.25); background: var(--card); }
+.dock-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--ink); font-size: 13px; font-weight: 700; padding: 0; flex: none; }
+@media (max-width: 640px) { .dock-card { width: 200px !important; right: 10px !important; } }
