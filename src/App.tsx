@@ -378,7 +378,7 @@ function Schedule() {
     return () => { off = true; clearInterval(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t])
-  const [calTab, setCalTab] = useState<'linh' | 'michael' | 'chi'>('linh')
+  const [calTab, setCalTab] = useState<'linh' | 'michael' | 'chi'>('michael')
   const connected = links && (links.linh || links.michael || links.chi)
   const tabHas = (k: 'linh' | 'michael' | 'chi') => !!links?.[k]
   return (
