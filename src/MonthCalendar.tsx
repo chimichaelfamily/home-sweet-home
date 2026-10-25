@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getCalIcons } from './lib/calIcons.ts'
 import { addMonthKey, monthLabel } from './lib/habits.ts'
 import { pad, today } from './lib/dates.ts'
 import { solarToLunar } from './lib/lunar.ts'
@@ -10,6 +11,8 @@ const Pocket = () => <svg width="18" height="20" viewBox="0 0 24 28" fill="none"
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export function MonthCalendar() {
+  const [icons, setIcons] = useState(getCalIcons())
+  useEffect(() => { const f = () => setIcons(getCalIcons()); window.addEventListener('hsh-calicons', f); return () => window.removeEventListener('hsh-calicons', f) }, [])
   const t = today()
   const [month, setMonth] = useState(t.slice(0, 7))
   const [x0, setX0] = useState<{ x: number; y: number } | null>(null)
@@ -52,9 +55,9 @@ export function MonthCalendar() {
             return (
               <div key={i} style={{ position: 'relative', minHeight: 70, borderRadius: 16, border: `1.5px solid ${isToday ? 'var(--accent)' : tet ? 'rgba(214,38,43,.55)' : 'var(--border)'}`, background: bg, padding: '8px 10px', overflow: 'hidden' }}>
                 <span style={{ fontSize: 20, fontWeight: isToday ? 700 : 500, ...(isToday ? { background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: 999, padding: '2px 9px' } : {}) }}>{d}</span>
-                {tet && <span style={{ position: 'absolute', right: 8, top: 6 }}><Pocket /></span>}
+                {tet && <span style={{ position: 'absolute', right: 8, top: 6, fontSize: 18, lineHeight: 1 }}>{icons.tet === 'pocket' ? <Pocket /> : icons.tet}</span>}
                 {holiday && <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, marginTop: 3, color: 'var(--blue-tx)' }}>{holiday}</div>}
-                {veg && <span style={{ position: 'absolute', left: 9, bottom: 6 }}><Leaf /></span>}
+                {veg && <span style={{ position: 'absolute', left: 9, bottom: 5, fontSize: 18, lineHeight: 1 }}>{icons.veg === 'leaf' ? <Leaf /> : icons.veg}</span>}
                 <span className="muted" style={{ position: 'absolute', right: 10, bottom: 6, fontSize: 12, fontWeight: l.day === 1 ? 700 : 400 }}>{label}</span>
               </div>
             )

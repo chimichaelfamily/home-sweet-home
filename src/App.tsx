@@ -11,6 +11,7 @@ import { clearErrors, getErrors, installGlobalHandlers, logError, markSeen, unse
 import { embedUrl } from './lib/embed.ts'
 import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
+import { getCalIcons, setCalIcon, TET_ICONS, VEG_ICONS } from './lib/calIcons.ts'
 import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
 import { addMonthKey, daysInMonth, longestInMonth, monthLabel, streak, weatherText } from './lib/habits.ts'
 import * as A from './lib/actions.ts'
@@ -296,7 +297,7 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
           {todayTasks.map(x => (
             <div className="row" key={x.id}>
               <button className={'circle' + (x.done_at ? ' done' : '')} aria-label={x.done_at ? `Undo ${x.title}` : `Tick ${x.title}`} onClick={() => x.done_at ? untick('task', x.id) : onTick({ kind: 'task', id: x.id, title: x.title, size: x.size })}>{x.done_at && <Check />}</button>
-              <div role="button" onClick={() => x.done_at ? untick('task', x.id) : onTick({ kind: 'task', id: x.id, title: x.title, size: x.size })} style={{ flex: 1, fontSize: 20, cursor: 'pointer', ...(x.done_at ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{x.title}</div>
+              <div role="button" onClick={() => x.done_at ? untick('task', x.id) : onTick({ kind: 'task', id: x.id, title: x.title, size: x.size })} style={{ flex: 1, fontSize: 17, cursor: 'pointer', ...(x.done_at ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{x.title}</div>
               {personTag(x.assignee) && <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>{personTag(x.assignee)}</span>}
               <span role="button" className={'pill ' + x.size} style={{ cursor: 'pointer' }} onClick={() => onEdit(x.id)}>+{POINTS[x.size]}</span>
               <button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button>
@@ -305,7 +306,7 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
           {doneRulesToday.map(e => (
             <div className="row" key={e.id}>
               <button className="circle done" aria-label={`Undo ${e.title}`} onClick={() => untick('rule', e.rule_id!)}><Check /></button>
-              <div role="button" onClick={() => untick('rule', e.rule_id!)} style={{ flex: 1, fontSize: 20, cursor: 'pointer', textDecoration: 'line-through', color: 'var(--muted)' }}>{e.title}</div>
+              <div role="button" onClick={() => untick('rule', e.rule_id!)} style={{ flex: 1, fontSize: 17, cursor: 'pointer', textDecoration: 'line-through', color: 'var(--muted)' }}>{e.title}</div>
               <button className="more" aria-label={`Edit ${e.title}`} onClick={() => onEditRule(e.rule_id!)}><Pencil /></button>
             </div>
           ))}
@@ -318,8 +319,8 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
               {over.slice(0, 3).map(r => (
                 <div className="row" key={r.id} style={{ minHeight: 46 }}>
                   <button className="circle late" style={{ width: 30, height: 30 }} aria-label={`Tick ${r.name}`} onClick={() => onTick({ kind: 'rule', id: r.id, title: r.name, size: r.size })} />
-                  <div role="button" onClick={() => onTick({ kind: 'rule', id: r.id, title: r.name, size: r.size })} style={{ flex: 1, fontSize: 19, fontWeight: 500, cursor: 'pointer' }}>{r.name}</div>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--late)' }}>{daysLate(r, t)} days late</span>
+                  <div role="button" onClick={() => onTick({ kind: 'rule', id: r.id, title: r.name, size: r.size })} style={{ flex: 1, fontSize: 16, fontWeight: 500, cursor: 'pointer' }}>{r.name}</div>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--late)' }}>{daysLate(r, t)} days late</span>
                   <button className="more" aria-label={`Edit ${r.name}`} onClick={() => onEditRule(r.id)}><Pencil /></button>
                 </div>
               ))}
@@ -327,10 +328,10 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
           )}
           {later.length > 0 && <div className="head" style={{ marginTop: 12 }}>LATER</div>}
           {later.map(x => (
-            <div className="row" key={x.id}><div className="circle" /><div style={{ flex: 1, fontSize: 20 }}>{x.title}<div className="muted" style={{ fontSize: 14 }}>{fmtShort(x.due_date)}</div></div><span role="button" className={'pill ' + x.size} style={{ cursor: 'pointer' }} onClick={() => onEdit(x.id)}>+{POINTS[x.size]}</span><button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button></div>
+            <div className="row" key={x.id}><div className="circle" /><div style={{ flex: 1, fontSize: 17 }}>{x.title}<div className="muted" style={{ fontSize: 12 }}>{fmtShort(x.due_date)}</div></div><span role="button" className={'pill ' + x.size} style={{ cursor: 'pointer' }} onClick={() => onEdit(x.id)}>+{POINTS[x.size]}</span><button className="more" aria-label={`Edit ${x.title}`} onClick={() => onEdit(x.id)}><Pencil /></button></div>
           ))}
         </div>
-        <button onClick={onAdd} style={{ marginTop: 8, height: 56, borderRadius: 16, border: '1.5px dashed var(--mborder)', background: 'transparent', fontSize: 19, fontWeight: 600 }}>+ Add task</button>
+        <button onClick={onAdd} style={{ marginTop: 8, height: 56, borderRadius: 16, border: '1.5px dashed var(--mborder)', background: 'transparent', fontSize: 16, fontWeight: 600 }}>+ Add task</button>
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
         <WeatherScene sky={wx ? skyOf(wx.code) : null} day={wx ? wx.day : true} temp={wx ? wx.temp : null}>
@@ -413,6 +414,7 @@ function Schedule() {
 function CalendarSettings() {
   const [links, setLinks] = useState<CalLinks | null>(null)
   const [msg, setMsg] = useState('')
+  const [icon, setIcon] = useState(getCalIcons())
   useEffect(() => { loadCalLinks().then(setLinks).catch(() => setLinks({ linh: '', michael: '', chi: '' })) }, [])
   if (!links) return <div className="muted">Loading…</div>
   const save1 = async (p: 'linh' | 'michael' | 'chi', v: string) => {
@@ -438,6 +440,20 @@ function CalendarSettings() {
         <input type="text" defaultValue={links.linh} placeholder="https://…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.linh) save1('linh', e.target.value) }} />
       </div>
       {msg && <div style={{ fontSize: 14 }}>{msg}</div>}
+      <div style={{ fontSize: 22, fontWeight: 600, marginTop: 10 }}>Calendar icons</div>
+      {([['veg', 'Vegetarian day', VEG_ICONS], ['tet', 'Lunar New Year', TET_ICONS]] as const).map(([k, lab, opts]) => (
+        <div key={k}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>{lab}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {opts.map(o => (
+              <button key={o} aria-pressed={icon[k] === o} onClick={() => { setCalIcon(k, o); setIcon(getCalIcons()) }} style={{ width: 54, height: 54, borderRadius: 16, fontSize: 26, border: '2.5px solid ' + (icon[k] === o ? 'var(--accent)' : 'var(--border)'), background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {o === 'leaf' ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 19C5 10 10 5 20 4c0 9-5 15-13 15z" fill="#3FA66B" stroke="#2B7D4D" strokeWidth="1.5" strokeLinejoin="round" /><path d="M5 19c3-5 6-8 10-10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                  : o === 'pocket' ? <svg width="24" height="28" viewBox="0 0 24 28" fill="none"><rect x="3" y="2" width="18" height="24" rx="3" fill="#D6262B" stroke="#9E1519" strokeWidth="1.5" /><path d="M3 9c6 5 12 5 18 0" stroke="#F6C453" strokeWidth="1.5" /><circle cx="12" cy="15" r="3.5" fill="#F6C453" /></svg> : o}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

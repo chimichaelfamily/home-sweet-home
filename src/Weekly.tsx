@@ -147,24 +147,13 @@ ${withGoals ? goalsText() : ''}`
         </div>
         <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ fontSize: 22, fontWeight: 600 }}>This week's note</div>
-          {!editing && (note ? <div style={{ fontSize: 17, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{note}</div> : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '10px 0 6px' }}>
-              <svg width="220" height="110" viewBox="0 0 220 110" fill="none" aria-hidden="true">
-                <path d="M10 98h200" stroke="var(--border)" strokeWidth="3" strokeLinecap="round" />
-                {[[40, 70, '#E58AA0'], [95, 58, '#F6C453'], [150, 66, '#9B8CE0'], [190, 78, '#7FC8A9']].map(([x, y, c], k) => (
-                  <g key={k}><path d={`M${x} 98V${y}`} stroke="#3FA66B" strokeWidth="3" strokeLinecap="round" /><path d={`M${x} ${Number(y) + 18}q10-8 14-2`} stroke="#3FA66B" strokeWidth="3" strokeLinecap="round" />
-                    {[0, 72, 144, 216, 288].map(r => <ellipse key={r} cx={x} cy={Number(y) - 9} rx="5" ry="8" fill={c as string} transform={`rotate(${r} ${x} ${y})`} />)}<circle cx={x} cy={y} r="5" fill="#fff" stroke="#E8D9B0" strokeWidth="1.500" /></g>
-                ))}
-                <text x="120" y="22" fontSize="16" fill="var(--muted)" fontWeight="700">z</text><text x="134" y="12" fontSize="12" fill="var(--muted)" fontWeight="700">z</text><text x="145" y="4" fontSize="9" fill="var(--muted)" fontWeight="700">z</text>
-              </svg>
-              <div className="muted" style={{ fontSize: 15, textAlign: 'center' }}>Resting. The flowers are waiting for this week's note.</div>
-            </div>))}
+          {!editing && (note ? <div style={{ fontSize: 17, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{note}</div> : null)}
           {editing && <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={8} placeholder="Write or paste your note" style={{ width: '100%', fontSize: 17, borderRadius: 16, border: '2px solid var(--border)', padding: 14, fontFamily: 'inherit' }} />}
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 15 }}><input type="checkbox" checked={withGoals} onChange={e => setWithGoals(e.target.checked)} style={{ width: 22, height: 22 }} />Also include my goals and money progress (sent to Gemini, Google's AI)</label>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn small" disabled={writing} onClick={write}>{writing ? 'Writing…' : note ? 'Write it again' : 'Write this week\'s newsletter'}</button>
             {!editing && <button className="btn small outline" onClick={() => setEditing(true)}>{note ? 'Edit note' : 'Write my own'}</button>}
-            {!editing && note && <button className="btn small outline" onClick={async () => { await saveNote(key, ''); setNote(''); setDraft(''); setMsg('Cleared.') }}>Clear note</button>}
+            {!editing && note && <button className="btn small outline" onClick={async () => { await saveNote(key, ''); setNote(''); setDraft(''); setMsg('') }}>Clear note</button>}
             {editing && <button className="btn small" onClick={async () => { await saveNote(key, draft.trim()); setNote(draft.trim()); setEditing(false); setMsg('Saved.') }}>Save note</button>}
             {editing && <button className="btn small outline" onClick={() => { setDraft(note); setEditing(false) }}>Cancel</button>}
           </div>

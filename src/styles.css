@@ -113,3 +113,6 @@ html[data-mode='dark'] .toast { background: #F2EDF9; color: #201C2B; }
 
 .more { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; font-size: 26px; line-height: 1; color: var(--muted); flex: none; padding: 0; }
 .more:active { background: var(--faint); }
+
+.todo-card .row { min-height: 46px; }
+.todo-card .circle { width: 28px; height: 28px; }
