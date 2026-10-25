@@ -70,19 +70,19 @@ export async function save(state: State, ops: Op[]): Promise<string | null> {
   return null
 }
 
-export type CalLinks = { linh: string; michael: string }
+export type CalLinks = { linh: string; michael: string; chi: string }
 const CAL_KEY = 'home-sweet-home.cal.v1'
 export async function loadCalLinks(): Promise<CalLinks> {
-  const out: CalLinks = { linh: '', michael: '' }
+  const out: CalLinks = { linh: '', michael: '', chi: '' }
   if (supabase) {
     const { data } = await supabase.from('calendars').select('person_id,url')
-    for (const r of data ?? []) if (r.person_id === 'linh' || r.person_id === 'michael') out[r.person_id as 'linh' | 'michael'] = r.url
+    for (const r of data ?? []) if (r.person_id === 'linh' || r.person_id === 'michael' || r.person_id === 'chi') out[r.person_id as keyof CalLinks] = r.url
     return out
   }
   try { return { ...out, ...JSON.parse(localStorage.getItem(CAL_KEY) || '{}') } } catch { return out }
 }
-export async function saveCalLink(person: 'linh' | 'michael', url: string, all: CalLinks) {
-  if (supabase) { await supabase.from('calendars').upsert({ person_id: person, url }, { onConflict: 'person_id' }); return }
+export async function saveCalLink(person: keyof CalLinks, url: string, all: CalLinks) {
+  if (supabase) { const { error } = await supabase.from('calendars').upsert({ person_id: person, url }, { onConflict: 'person_id' }); if (error) throw new Error(error.message); return }
   try { localStorage.setItem(CAL_KEY, JSON.stringify({ ...all, [person]: url })) } catch { /* ignore */ }
 }
 

@@ -370,6 +370,7 @@ function Schedule() {
         const all: CalEvent[] = []
         if (l.linh) all.push(...await fetchCalendar(l.linh, 'linh', days[0], days[days.length - 1]))
         if (l.michael) all.push(...await fetchCalendar(l.michael, 'michael', days[0], days[days.length - 1]))
+        if (l.chi) all.push(...await fetchCalendar(l.chi, 'chi', days[0], days[days.length - 1]))
         if (!off) { setEvents(all); setErr('') }
       } catch (e) { logError('Calendar', e); if (!off) setErr('Could not refresh the calendar. Showing the last update.') }
     }
@@ -377,20 +378,20 @@ function Schedule() {
     return () => { off = true; clearInterval(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t])
-  const [calTab, setCalTab] = useState<'linh' | 'michael'>('linh')
-  const connected = links && (links.linh || links.michael)
-  const tabHas = (k: 'linh' | 'michael') => !!links?.[k]
+  const [calTab, setCalTab] = useState<'linh' | 'michael' | 'chi'>('linh')
+  const connected = links && (links.linh || links.michael || links.chi)
+  const tabHas = (k: 'linh' | 'michael' | 'chi') => !!links?.[k]
   return (
     <div className="card grow-min" style={{ flex: 1, padding: '16px 24px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ fontSize: 24, fontWeight: 600 }}>Schedule</div>
         <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
-          {([['linh', 'Household'], ['michael', 'Michael']] as const).map(([k, l]) => <button key={k} onClick={() => setCalTab(k)} style={{ height: 34, padding: '0 14px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 14, background: calTab === k ? 'var(--accent)' : 'transparent', color: calTab === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+          {([['michael', 'Michael'], ['chi', 'Chi'], ['linh', 'Both']] as const).map(([k, l]) => <button key={k} onClick={() => setCalTab(k)} style={{ height: 34, padding: '0 14px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 14, background: calTab === k ? 'var(--accent)' : 'transparent', color: calTab === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
         </div>
       </div>
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
-        {links && connected && !tabHas(calTab) && <div className="muted" style={{ fontSize: 15 }}>No {calTab === 'linh' ? 'household' : "Michael's"} calendar added yet. Settings → Calendars.</div>}
-        {links && !connected && <div className="muted" style={{ fontSize: 16, lineHeight: 1.5 }}>No calendar yet. Open Settings → Calendars and paste the shared household calendar link.</div>}
+        {links && connected && !tabHas(calTab) && <div className="muted" style={{ fontSize: 15 }}>No {calTab === 'linh' ? 'shared' : calTab === 'chi' ? "Chi's" : "Michael's"} calendar added yet. Settings → Calendars.</div>}
+        {links && !connected && <div className="muted" style={{ fontSize: 16, lineHeight: 1.5 }}>No calendar yet. Open Settings → Calendars and paste a calendar link.</div>}
         {connected && tabHas(calTab) && days.map(d => {
           const ev = events.filter(e => e.day === d && e.person === calTab).sort((a, b) => a.sort - b.sort)
           return (
@@ -412,23 +413,29 @@ function Schedule() {
 function CalendarSettings() {
   const [links, setLinks] = useState<CalLinks | null>(null)
   const [msg, setMsg] = useState('')
-  useEffect(() => { loadCalLinks().then(setLinks).catch(() => setLinks({ linh: '', michael: '' })) }, [])
+  useEffect(() => { loadCalLinks().then(setLinks).catch(() => setLinks({ linh: '', michael: '', chi: '' })) }, [])
   if (!links) return <div className="muted">Loading…</div>
-  const save1 = async (p: 'linh' | 'michael', v: string) => {
+  const save1 = async (p: 'linh' | 'michael' | 'chi', v: string) => {
     v = v.trim()
     if (v && !/^https:\/\/(calendar\.google\.com|outlook\.office365\.com|outlook\.office\.com|outlook\.live\.com)\//.test(v)) { setMsg('That does not look like a Google or Outlook calendar link (an .ics link).'); return }
-    setMsg(''); await saveCalLink(p, v, links); setLinks({ ...links, [p]: v }); setMsg('Saved. The schedule refreshes within a few minutes, or reload the app.')
+    setMsg('')
+    try { await saveCalLink(p, v, links); setLinks({ ...links, [p]: v }); setMsg('Saved. The schedule refreshes within a few minutes, or reload the app.') }
+    catch (e) { logError('Calendar: saving link', e); setMsg('Could not save. Has 010_third_calendar.sql been run?') }
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
       <div style={{ fontSize: 30, fontWeight: 600 }}>Calendars</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={{ fontWeight: 600 }}>Household calendar link</label>
-        <input type="text" defaultValue={links.linh} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.linh) save1('linh', e.target.value) }} />
+        <label style={{ fontWeight: 600 }}>Michael's calendar link</label>
+        <input type="text" defaultValue={links.michael} placeholder="https://…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.michael) save1('michael', e.target.value) }} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={{ fontWeight: 600 }}>Michael's calendar link</label>
-        <input type="text" defaultValue={links.michael} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.michael) save1('michael', e.target.value) }} />
+        <label style={{ fontWeight: 600 }}>Chi's calendar link</label>
+        <input type="text" defaultValue={links.chi} placeholder="https://…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.chi) save1('chi', e.target.value) }} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <label style={{ fontWeight: 600 }}>Both of us (shared) calendar link</label>
+        <input type="text" defaultValue={links.linh} placeholder="https://…/basic.ics" onBlur={e => { if (e.target.value.trim() !== links.linh) save1('linh', e.target.value) }} />
       </div>
       {msg && <div style={{ fontSize: 14 }}>{msg}</div>}
     </div>

@@ -1,7 +1,8 @@
 import ICAL from 'ical.js'
 import { addDays, fromYmd, toYmd } from './dates.ts'
 
-export interface CalEvent { title: string; day: string; time: string; allDay: boolean; sort: number; person: 'linh' | 'michael' }
+export type CalKey = 'linh' | 'michael' | 'chi' // linh = the shared (Both) calendar
+export interface CalEvent { title: string; day: string; time: string; allDay: boolean; sort: number; person: CalKey }
 
 /** Days to show: Mon..Sun this week; Saturday shows Sat+Sun; Sunday shows today + all of next week. */
 export function scheduleDays(todayYmd: string): string[] {
@@ -14,7 +15,7 @@ export function scheduleDays(todayYmd: string): string[] {
 
 const hm = (d: Date) => d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).replace(' ', '').toLowerCase()
 
-export function parseIcs(text: string, person: 'linh' | 'michael', from: string, to: string): CalEvent[] {
+export function parseIcs(text: string, person: CalKey, from: string, to: string): CalEvent[] {
   const out: CalEvent[] = []
   const lo = fromYmd(from), hi = fromYmd(addDays(to, 1))
   const comp = new ICAL.Component(ICAL.parse(text))
@@ -48,7 +49,7 @@ export function parseIcs(text: string, person: 'linh' | 'michael', from: string,
 }
 function addDaysDate(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x }
 
-export async function fetchCalendar(url: string, person: 'linh' | 'michael', from: string, to: string): Promise<CalEvent[]> {
+export async function fetchCalendar(url: string, person: CalKey, from: string, to: string): Promise<CalEvent[]> {
   const r = await fetch('/api/ical?url=' + encodeURIComponent(url))
   if (!r.ok) throw new Error(await r.text())
   return parseIcs(await r.text(), person, from, to)
