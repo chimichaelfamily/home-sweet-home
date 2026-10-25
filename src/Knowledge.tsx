@@ -4,12 +4,18 @@ import { askAI } from './lib/ai.ts'
 import { factsOf, hasThisWeek, loadBank, refill, speechesOf, talksOf, type BankKind, type BankRow } from './lib/bank.ts'
 import { today } from './lib/dates.ts'
 import {
-  FACT_CATS, dailyIndex, goodreadsBooks, type BankSpeech, type BankTalk, FALLBACK_FACTS, SETTINGS, TOPICS, fmtMinutes, loadKnowledge, parseDialogue, parseFact, pickRandom, saveKnowledge, shuffled, speakMinutes, wordCount,
+  dailyIndex, goodreadsBooks, type BankSpeech, type BankTalk, FALLBACK_FACTS, SETTINGS, TOPICS, fmtMinutes, loadKnowledge, parseDialogue, parseFact, pickRandom, saveKnowledge, shuffled, speakMinutes, wordCount,
   type Dialogue, type Fact, type KItem, type KKind,
 } from './lib/knowledge.ts'
 
 type Sub = 'books' | 'speaking' | 'talk' | 'facts'
 const MIGRATION_HINT = 'Could not load or save. Has 012_knowledge.sql been run in Supabase?'
+/** Today's date, updating by itself after midnight (the door iPad stays open for days). */
+function useToday() {
+  const [d, setD] = useState(today())
+  useEffect(() => { const id = setInterval(() => setD(today()), 60000); return () => clearInterval(id) }, [])
+  return d
+}
 const ask = (prompt: string, system?: string) => askAI([{ role: 'user', text: prompt }], system)
 
 function Seg<T extends string>({ options, value, onChange }: { options: [T, string][]; value: T; onChange: (v: T) => void }) {
@@ -75,7 +81,7 @@ export function Knowledge() {
         <div style={show('books')}><Books books={of('book')} upsert={upsert} remove={remove} make={make} upsertMany={upsertMany} /></div>
         <div style={show('speaking')}><Scripts scripts={of('script')} upsert={upsert} remove={remove} make={make} bank={speeches} /></div>
         <div style={show('talk')}><SmallTalk bank={talks} /></div>
-        <div style={show('facts')}><Facts saved={of('fact')} upsert={upsert} remove={remove} make={make} bank={facts} /></div>
+        <div style={show('facts')}><Facts bank={facts} /></div>
         {sub !== 'books' && (
           <div className="muted" style={{ fontSize: 13, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 14 }}>
             <span>Practice bank: {facts.length} facts · {talks.length} chats · {speeches.length} speeches. A new batch is added every week.</span>
@@ -181,7 +187,9 @@ function Scripts({ scripts, upsert, remove, make, bank }: { scripts: KItem[]; ba
   const [pick, setPick] = useState<number | null>(null)
   const [full, setFull] = useState(false)
   const [prompt, setPrompt] = useState(false)
-  const idx = pick ?? dailyIndex(today(), 'speech', bank.length)
+  const day = useToday()
+  useEffect(() => { setPick(null) }, [day])
+  const idx = pick ?? dailyIndex(day, 'speech', bank.length)
   const piece = bank[idx]
   const cur = scripts.find(s => s.id === open)
   return (
@@ -305,9 +313,9 @@ function SmallTalk({ bank }: { bank: BankTalk[] }) {
   const [setting, setSetting] = useState('')
   const [convo, setConvo] = useState<Dialogue | null>(null)
   const [daily, setDaily] = useState(false)
-  const usedBank = useRef(false)
+  const day = useToday(); const shownDay = useRef('')
   const fromBank = (t: BankTalk, isDaily: boolean) => { setTopic(t.topic); setSetting(t.setting); setConvo({ lines: t.lines, tip: t.tip, phrases: t.phrases }); setShown(new Set()); setMode('read'); setDaily(isDaily); setErr('') }
-  useEffect(() => { if (!usedBank.current && bank.length && !convo) { usedBank.current = true; fromBank(bank[dailyIndex(today(), 'talk', bank.length)], true) } }, [bank]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (bank.length && shownDay.current !== day) { shownDay.current = day; fromBank(bank[dailyIndex(day, 'talk', bank.length)], true) } }, [bank, day]) // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const [mode, setMode] = useState<'read' | 'first' | 'second'>('read')
   const [shown, setShown] = useState<Set<number>>(new Set())
@@ -367,60 +375,43 @@ Format every line exactly as "Name: text" using only two first names. Then add o
 }
 
 // ================= Random facts =================
-function Facts({ saved, upsert, remove, make, bank }: { saved: KItem[]; bank: Fact[] } & Ops) {
-  const [cat, setCat] = useState('Any')
+function Facts({ bank }: { bank: Fact[] }) {
   const [fact, setFact] = useState<Fact | null>(null)
   const [daily, setDaily] = useState(false)
-  const usedBank = useRef(false)
-  useEffect(() => { if (!usedBank.current && bank.length && !fact) { usedBank.current = true; const f = bank[dailyIndex(today(), 'fact', bank.length)]; setFact(f); setDaily(true); seen.current.push(f.text) } }, [bank]) // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false); const [note, setNote] = useState('')
   const seen = useRef<string[]>([])
+  const day = useToday(); const shownDay = useRef('')
+  useEffect(() => { if (bank.length && shownDay.current !== day) { shownDay.current = day; const f = bank[dailyIndex(day, 'fact', bank.length)]; setFact(f); setDaily(true); seen.current.push(f.text) } }, [bank, day])
   const next = async () => {
     setNote(''); setDaily(false)
-    const pool = bank.filter(f => (cat === 'Any' || f.cat === cat) && f.text !== fact?.text)
+    const pool = bank.filter(f => f.text !== fact?.text)
     if (pool.length) {
       const fresh = pool.filter(f => !seen.current.includes(f.text)); const from = fresh.length ? fresh : pool
       const f = from[Math.floor(Math.random() * from.length)]; setFact(f); seen.current.push(f.text); return
     }
     setBusy(true)
     try {
-      const raw = await ask(`Tell me one surprising, true and well-documented fact${cat === 'Any' ? '' : ` about: ${cat}`}. Do not repeat any of these: ${seen.current.slice(-12).join(' | ') || 'none yet'}. If you are not certain a fact is true, choose a different one.
+      const raw = await ask(`Tell me one surprising, true and well-documented fact. Do not repeat any of these: ${seen.current.slice(-12).join(' | ') || 'none yet'}. If you are not certain a fact is true, choose a different one.
 Format: one line starting "FACT:" (at most 2 sentences) and one line starting "WHY:" (one sentence on why it is true or interesting). No other text.`)
-      const f = parseFact(raw, cat); setFact(f); seen.current.push(f.text)
+      const f = parseFact(raw, 'Any'); setFact(f); seen.current.push(f.text)
     } catch {
       const f = pickRandom(FALLBACK_FACTS, FALLBACK_FACTS.filter(x => seen.current.includes(x.text)))
       setFact({ ...f, cat: 'Any' }); seen.current.push(f.text); setNote('The AI is busy, so this one is from the built-in list.')
     } finally { setBusy(false) }
   }
-  const isSaved = fact ? saved.find(s => s.title === fact.text) : undefined
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Seg options={FACT_CATS.map(c => [c, c] as [string, string])} value={cat} onChange={setCat} />
-      <div className="card" style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 200 }}>
-        {fact ? (
-          <>
-            {daily && <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.5 }}>TODAY'S FACT</div>}
-            <div style={{ fontSize: 26, fontWeight: 600, lineHeight: 1.3 }}>{fact.text}</div>
-            {fact.why && <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>{fact.why}</div>}
-            {note && <div className="muted" style={{ fontSize: 13 }}>{note}</div>}
-          </>
-        ) : <div className="muted" style={{ fontSize: 18 }}>Tap the button for a random fact you can share in a conversation.</div>}
-        <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-          <button className="btn small" disabled={busy} onClick={next}>{busy ? 'Finding one…' : fact ? 'Another fact' : 'Show me a fact'}</button>
-          {fact && (isSaved ? <button className="btn small outline" onClick={() => remove(isSaved.id)}>Saved ✓</button>
-            : <button className="btn small outline" onClick={() => upsert(make('fact', { title: fact.text, body: fact.why, cat: fact.cat }))}>Save</button>)}
-        </div>
+    <div className="card" style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 200 }}>
+      {fact ? (
+        <>
+          {daily && <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.5 }}>TODAY'S FACT</div>}
+          <div style={{ fontSize: 26, fontWeight: 600, lineHeight: 1.3 }}>{fact.text}</div>
+          {fact.why && <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>{fact.why}</div>}
+          {note && <div className="muted" style={{ fontSize: 13 }}>{note}</div>}
+        </>
+      ) : <div className="muted" style={{ fontSize: 18 }}>Tap the button for a random fact you can share in a conversation.</div>}
+      <div style={{ marginTop: 'auto' }}>
+        <button className="btn small" disabled={busy} onClick={next}>{busy ? 'Finding one…' : fact ? 'Another fact' : 'Show me a fact'}</button>
       </div>
-      {saved.length > 0 && (
-        <div className="card" style={{ padding: '14px 22px' }}>
-          <div className="muted" style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1.5, marginBottom: 4 }}>SAVED FACTS</div>
-          {saved.map(s => (
-            <div key={s.id} className="row" style={{ minHeight: 56, padding: '6px 0' }}>
-              <div style={{ flex: 1 }}><div style={{ fontSize: 17, fontWeight: 600 }}>{s.title}</div>{s.body && <div className="muted" style={{ fontSize: 14 }}>{s.body}</div>}</div>
-              <button className="btn small outline" onClick={() => remove(s.id)}>Remove</button>
-            </div>
-          ))}
-        </div>)}
     </div>
   )
 }
