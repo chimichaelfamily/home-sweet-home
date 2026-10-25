@@ -60,6 +60,13 @@ export async function getGoodreadsUrl(): Promise<string> {
   if (supabase) { const { data } = await supabase.from('calendars').select('url').eq('person_id', 'goodreads').maybeSingle(); return data?.url ?? '' }
   try { return localStorage.getItem(GR_KEY) || '' } catch { return '' }
 }
+/** Accepts the RSS link, a profile link (goodreads.com/user/show/123-name) or a My Books link, and returns the RSS link. */
+export function goodreadsRssFrom(input: string): string | null {
+  const v = input.trim()
+  if (/^https:\/\/(www\.)?goodreads\.com\/review\/list_rss\//.test(v)) return v
+  const m = v.match(/goodreads\.com\/(?:user\/show|review\/list)\/(\d+)/)
+  return m ? `https://www.goodreads.com/review/list_rss/${m[1]}?shelf=%23ALL%23` : null
+}
 export async function setGoodreadsUrl(url: string) {
   if (supabase) { const { error } = await supabase.from('calendars').upsert({ person_id: 'goodreads', url }, { onConflict: 'person_id' }); if (error) throw error; return }
   try { localStorage.setItem(GR_KEY, url) } catch { /* ignore */ }
@@ -79,10 +86,10 @@ export async function syncGoodreads(url: string): Promise<{ added: number; updat
   try { localStorage.setItem(GR_SYNC, new Date().toISOString()) } catch { /* ignore */ }
   return { ...res, seen: all.length }
 }
-/** Called when the app opens: syncs at most twice a day. */
+/** Called when the app opens: syncs at most once a week. */
 export async function autoSyncGoodreads() {
   const last = lastGoodreadsSync()
-  if (last && Date.now() - Date.parse(last) < 12 * 3600 * 1000) return
+  if (last && Date.now() - Date.parse(last) < 7 * 24 * 3600 * 1000) return
   const url = await getGoodreadsUrl().catch(() => '')
   if (url) await syncGoodreads(url).catch(() => { /* try again next time */ })
 }

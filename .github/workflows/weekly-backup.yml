@@ -1,0 +1,52 @@
+# Every Monday morning (Melbourne time) this copies everything in the database into the "backups" branch of this repo.
+# Needs two repository secrets: SUPABASE_URL and SUPABASE_SERVICE_KEY (Settings → Secrets and variables → Actions).
+name: Weekly backup
+on:
+  schedule:
+    - cron: '0 20 * * 0' # Sunday 20:00 UTC = Monday 7am in Melbourne (6am in winter)
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "Add SUPABASE_URL and SUPABASE_SERVICE_KEY as repository secrets first."; exit 1; fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Switch to the backups branch
+        run: |
+          git config user.name "Weekly backup"
+          git config user.email "backup@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin backups >/dev/null; then
+            git fetch origin backups && git checkout backups
+          else
+            git checkout --orphan backups && git rm -rf . >/dev/null
+            printf '# Backups\nOne JSON file per week, made by the Weekly backup workflow on main.\n' > README.md
+          fi
+      - name: Download every table
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          day=$(TZ=Australia/Melbourne date +%F)
+          mkdir -p weekly
+          out="weekly/backup-$day.json"
+          echo "{\"saved_at\": \"$(date -u +%FT%TZ)\"" > "$out"
+          for t in people tasks rules point_events snoozes habits habit_logs calendars morning_items private_items products weekly_notes knowledge_items knowledge_bank; do
+            body=$(curl -sf "$URL/rest/v1/$t?select=*" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" || echo '"missing"')
+            printf ', "%s": %s' "$t" "$body" >> "$out"
+          done
+          echo "}" >> "$out"
+          python3 -c "import json,sys; d=json.load(open('$out')); print({k: (len(v) if isinstance(v, list) else v) for k, v in d.items()})"
+      - name: Save to GitHub
+        run: |
+          git add -A
+          git commit -m "Weekly backup $(TZ=Australia/Melbourne date +%F)" || echo "Nothing changed"
+          git push origin backups

@@ -13,8 +13,7 @@ import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
 import { lockRegister, lockRegistered, lockReset, lockSupported } from './lib/privateData.ts'
 import { Knowledge } from './Knowledge.tsx'
-import { getGoodreadsUrl, importGoodreadsList, lastGoodreadsSync, setGoodreadsUrl, syncGoodreads } from './lib/knowledge.ts'
-import { goodreadsBooks } from './lib/ktext.ts'
+import { getGoodreadsUrl, goodreadsRssFrom, lastGoodreadsSync, setGoodreadsUrl, syncGoodreads } from './lib/knowledge.ts'
 import { IconView } from './CalIconArt.tsx'
 import { getCalIcons, setCalIcon, TET_ICONS, VEG_ICONS } from './lib/calIcons.ts'
 import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
@@ -102,7 +101,7 @@ export default function App() {
         {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Affirmation'], ['private', 'Goals'], ['weekly', 'Report'], ['knowledge', 'Knowledge'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
         ))}
-        {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenSec('errors') }}>Something went wrong: see Settings → Logs</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
+        {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenSec('errors') }}>Something went wrong: see Settings → Logs</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : ''}</span>}
       </nav>
       {adding && <AddTask onClose={() => setAdding(false)} onAdd={async (t, sz) => { setAdding(false); if (stateRef.current) await apply(A.addTask(stateRef.current, t, sz)) }} />}
       {editing && (() => {
@@ -206,11 +205,6 @@ function useDark(mode: 'light' | 'dark' | 'auto'): boolean {
   if (mode === 'light') return false
   if (sun) return now >= sun.set || now < sun.rise
   const h = new Date(now).getHours(); return h >= 19 || h < 6
-}
-
-function backupDue(): boolean {
-  const b = lastBackup(); if (!b) return false
-  return diffDays(today(), b) > 35
 }
 
 function Habits({ s, apply }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown> }) {
@@ -797,33 +791,27 @@ function RuleDialog({ rule, onSave, onDelete, onClose }: { rule: Rule | null; on
 }
 
 function GoodreadsSettings() {
-  const file = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState('')
   const [url, setUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [last, setLast] = useState(lastGoodreadsSync())
   useEffect(() => { getGoodreadsUrl().then(setUrl).catch(() => setUrl('')) }, [])
-  const importCsv = async (f: File | undefined) => {
-    if (!f) return
-    const list = goodreadsBooks(await f.text())
-    if (!list.length) { setMsg('That file does not look like a Goodreads export.'); return }
-    try { const r = await importGoodreadsList(list); setMsg(`Imported: ${r.added} new, ${r.updated} updated.`) } catch (e) { logError('Goodreads import', e); setMsg('Could not save. Has 012_knowledge.sql been run?') }
-  }
   const sync = async (u: string) => {
     setBusy(true); setMsg('')
     try { const r = await syncGoodreads(u); setLast(lastGoodreadsSync()); setMsg(`Synced ${r.seen} books from Goodreads: ${r.added} new, ${r.updated} updated.`) }
-    catch (e) { logError('Goodreads sync', e); setMsg((e as Error).message) } finally { setBusy(false) }
+    catch (e) { logError('Goodreads sync', e); setMsg((e as Error).message + ' If your Goodreads profile is private, use the RSS link instead of the profile link.') } finally { setBusy(false) }
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
       <div style={{ fontSize: 30, fontWeight: 600 }}>Goodreads</div>
-      <div style={{ fontSize: 20, fontWeight: 600 }}>Import everything once</div>
-      <div className="muted" style={{ fontSize: 15 }}>goodreads.com → My Books → Import and export → Export library, then choose that file.</div>
-      <div><button className="btn small" onClick={() => file.current?.click()}>Choose Goodreads file</button><input ref={file} type="file" accept=".csv,text/csv" hidden onChange={e => { importCsv(e.target.files?.[0]); e.target.value = '' }} /></div>
-      <div style={{ fontSize: 20, fontWeight: 600, marginTop: 8 }}>Keep in sync every day</div>
-      <div className="muted" style={{ fontSize: 15 }}>On goodreads.com open My Books, scroll to the bottom and copy the RSS link. New books, shelves and ratings then come into the app by themselves.</div>
-      {url !== null && <input type="text" defaultValue={url} placeholder="https://www.goodreads.com/review/list_rss/…" onBlur={async e => { const v = e.target.value.trim(); if (v === url) return; if (v && !/^https:\/\/(www\.)?goodreads\.com\/review\/list_rss\//.test(v)) { setMsg('That is not a Goodreads RSS link.'); return } try { await setGoodreadsUrl(v); setUrl(v); setMsg(v ? 'Saved.' : 'Removed.'); if (v) sync(v) } catch (er) { logError('Goodreads link', er); setMsg('Could not save the link.') } }} />}
-      {url && <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><button className="btn small outline" disabled={busy} onClick={() => sync(url)}>{busy ? 'Syncing…' : 'Sync now'}</button><span className="muted" style={{ fontSize: 14 }}>{last ? `Last synced ${new Date(last).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Not synced yet'}</span></div>}
+      <div className="muted" style={{ fontSize: 15 }}>Paste your Goodreads profile link. New books, shelves and ratings come into the app once a week.</div>
+      {url !== null && <input type="text" defaultValue={url} placeholder="https://www.goodreads.com/user/show/…" onBlur={async e => {
+        const raw = e.target.value.trim(); if (raw === url) return
+        const v = raw ? goodreadsRssFrom(raw) : ''
+        if (v === null) { setMsg('That does not look like a Goodreads profile or RSS link.'); return }
+        try { await setGoodreadsUrl(v); setUrl(v); e.target.value = v; setMsg(v ? 'Saved.' : 'Removed.'); if (v) sync(v) } catch (er) { logError('Goodreads link', er); setMsg('Could not save the link.') }
+      }} />}
+      {url && <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}><button className="btn small outline" disabled={busy} onClick={() => sync(url)}>{busy ? 'Syncing…' : 'Sync now'}</button><span className="muted" style={{ fontSize: 14 }}>{last ? `Last synced ${new Date(last).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}` : 'Not synced yet'}</span></div>}
       {msg && <div style={{ fontSize: 15 }}>{msg}</div>}
     </div>
   )
@@ -946,7 +934,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
           {sec === 'backup' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 520 }}>
               <div style={{ fontSize: 30, fontWeight: 600 }}>Backup</div>
-              <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Downloads everything (tasks, points, rules, habits, morning, private goals and money, products, weekly notes) as one file. Save it somewhere safe, like iCloud Drive. Do this about once a month.</div>
+              <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Everything is copied to GitHub automatically every Monday morning. You can also download a copy now.</div>
               <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={download}>Download backup</button>
               <div className="muted" style={{ fontSize: 15 }}>{bk ? `Last backup: ${bk}` : 'No backup yet.'} The backup file contains your private goals and money, so keep it private.</div>
               {!usingDatabase && <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset demo data on this device?')) { try { localStorage.removeItem('home-sweet-home.v1') } catch { /* ignore */ } apply({ state: emptyState(), ops: [] }) } }}>Reset demo data</button>}

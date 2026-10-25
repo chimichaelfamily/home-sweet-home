@@ -9,5 +9,10 @@
     "api/*.js": {
       "maxDuration": 60
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "backups": false
+    }
   }
 }
