@@ -150,6 +150,24 @@ function Vision({ counts, pins, edit, add, upsert, remove }: { counts: PItem[]; 
   )
 }
 
+/** Add to or take away from the amount saved, by 500 or any number you type. */
+function Adjust({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [amt, setAmt] = useState('500')
+  const a = Math.abs(Number(amt)) || 0
+  const bump = (sign: 1 | -1) => { if (a > 0) onChange(Math.max(0, Math.round((value + sign * a) * 100) / 100)) }
+  const round = { width: 52, height: 52, borderRadius: '50%', fontSize: 28, fontWeight: 600, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 } as const
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+      <button className="btn outline" aria-label={`Take away ${a} dollars`} style={round} onClick={() => bump(-1)}>−</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, height: 52, padding: '0 14px', borderRadius: 16, border: '2px solid var(--border)', background: 'var(--card)' }}>
+        <span style={{ fontSize: 20, fontWeight: 600 }}>$</span>
+        <input type="number" inputMode="decimal" aria-label="Amount" value={amt} onChange={e => setAmt(e.target.value)} style={{ width: 90, height: 40, border: 'none', padding: 0, fontSize: 20, fontWeight: 600, background: 'transparent' }} />
+      </div>
+      <button className="btn" aria-label={`Add ${a} dollars`} style={round} onClick={() => bump(1)}>+</button>
+    </div>
+  )
+}
+
 function Money({ rows, edit, add, upsert, remove }: { rows: PItem[] } & Ops) {
   const [n, setN] = useState(''); const [t, setT] = useState(''); const [y, setY] = useState(String(new Date().getFullYear() + 1)); const [sv, setSv] = useState('')
   const years = [...new Set(rows.map(r => r.cat))].sort()
@@ -174,6 +192,7 @@ function Money({ rows, edit, add, upsert, remove }: { rows: PItem[] } & Ops) {
                 </div>
                 <div style={{ height: 12, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 12, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
                 <div className="muted" style={{ fontSize: 14 }}>{left > 0 ? `${money(per)} a month until Dec ${yr}` : 'Reached!'}</div>
+                {!edit && <Adjust value={r.num1} onChange={v => upsert({ ...r, num1: v })} />}
                 {edit && (
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 4 }}>
                     <label style={{ flex: '2 1 180px' }}>Goal name<input type="text" defaultValue={r.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== r.title) upsert({ ...r, title: v }) }} style={{ width: '100%' }} /></label>
