@@ -186,3 +186,6 @@ html[data-mode='dark'] .toast { background: #F2EDF9; color: #201C2B; }
 .wall-tile { break-inside: avoid; margin-bottom: 12px; }
 @media (max-width: 900px) { .photo-wall { column-count: 2; } }
 @media (max-width: 420px) { .photo-wall { column-count: 1; } }
+
+.anchor-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px; }
+@media (max-width: 760px) { .anchor-grid { grid-template-columns: 1fr; } }

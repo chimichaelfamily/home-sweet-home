@@ -1,6 +1,7 @@
 import { Credit, PhotoPicker } from './PhotoPicker.tsx'
 import { logError } from './lib/errorlog.ts'
 import type { Task } from './lib/types.ts'
+import { ANCHORS } from './lib/anchors.ts'
 import { useEffect, useRef, useState } from 'react'
 import { daysUntil, lockRegister, lockRegistered, lockReset, lockSupported, lockUnlock, loadPrivate, money, monthsTo, savePrivate, type Kind, type PItem } from './lib/privateData.ts'
 
@@ -53,12 +54,6 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
   useEffect(() => { loadPrivate().then(setItems).catch(() => { logError('Goals: loading', 'Could not load. Has 005_private.sql been run?'); setErr('Could not load. Has 005_private.sql been run?') }) }, [])
   const of = (k: Kind) => items.filter(x => x.kind === k).sort((a, b) => a.sort - b.sort)
   const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); savePrivate(next, { upsert: it }).catch(() => { logError('Goals: saving', 'Could not save. Have 005_private.sql and 011_goal_steps.sql been run?'); setErr('Could not save. Have 005_private.sql and 011_goal_steps.sql been run?') }) }
-  const addMany = (kind: Kind, base: Partial<PItem>, titles: string[]) => {
-    const l = of(kind); let sort = l[l.length - 1]?.sort ?? 0
-    const made: PItem[] = titles.map((title, i) => ({ id: `${kind}-${Date.now().toString(36)}-${i}`, kind, title, sub: '', cat: '', num1: 0, num2: 0, day: null, sort: ++sort, ...base }))
-    const next = [...items, ...made]; setItems(next)
-    made.reduce((p, it) => p.then(() => savePrivate(next, { upsert: it })), Promise.resolve()).catch(() => setErr('Could not save.'))
-  }
   const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); savePrivate(next, { remove: id }).catch(() => setErr('Could not remove.')) }
   const add = (kind: Kind, f: Partial<PItem>) => { const l = of(kind); upsert({ id: `${kind}-${Date.now().toString(36)}`, kind, title: '', sub: '', cat: '', num1: 0, num2: 0, day: null, sort: (l[l.length - 1]?.sort ?? 0) + 1, ...f }) }
   return (
@@ -74,7 +69,7 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
       </div>
       {err && <div style={{ fontSize: 14 }}>{err}</div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
-        {sub === 'goals' && <Goals pillars={of('pillar')} anchors={of('ladder').filter(x => x.cat === ANCHOR)} addMany={addMany} steps={of('step')} tasks={tasks} onPush={onPush} edit={edit} add={add} upsert={upsert} remove={remove} />}
+        {sub === 'goals' && <Goals pillars={of('pillar')} steps={of('step')} tasks={tasks} onPush={onPush} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'vision' && <Vision counts={of('countdown')} pins={of('pin')} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'money' && <Money rows={of('money')} edit={edit} add={add} upsert={upsert} remove={remove} />}
       </div>
@@ -84,40 +79,27 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
 
 interface Ops { edit: boolean; add: (k: Kind, f: Partial<PItem>) => void; upsert: (i: PItem) => void; remove: (id: string) => void }
 const RM = ({ onClick }: { onClick: () => void }) => <button className="btn small outline" onClick={onClick}>Remove</button>
-const ANCHOR = 'ANCHOR' // stored as a 'ladder' row so no database change is needed
 
-function Goals({ pillars, anchors, addMany, steps, tasks, onPush, edit, add, upsert, remove }: { pillars: PItem[]; anchors: PItem[]; addMany: (kind: Kind, base: Partial<PItem>, titles: string[]) => void; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string } & Ops) {
+function Goals({ pillars, steps, tasks, onPush, edit, add, upsert, remove }: { pillars: PItem[]; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string } & Ops) {
   const [pt, setPt] = useState('')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [paste, setPaste] = useState('')
-  const [an, setAn] = useState('')
   const taskOf = (st: PItem) => (st.sub.startsWith('task:') ? tasks.find(t => t.id === st.sub.slice(5)) : undefined)
   const isDone = (st: PItem) => st.num1 === 1 || !!taskOf(st)?.done_at
   const inTodo = (st: PItem) => { const t = taskOf(st); return !!t && !t.done_at }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 22, fontWeight: 600 }}>Our anchors</div>
-        <div className="muted" style={{ fontSize: 14 }}>What we are building towards. Read these when you need to keep going.</div>
-        {anchors.map(a => (
-          <div key={a.id} className="row" style={{ minHeight: 46 }}>
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style={{ flex: 'none' }}><path d="M6 0l6 6-6 6-6-6z" fill="var(--accent)" /></svg>
-            {edit ? <input type="text" aria-label="Anchor" defaultValue={a.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.title) upsert({ ...a, title: v }) }} style={{ flex: 1, minWidth: 0 }} />
-              : <div style={{ flex: 1, fontSize: 19, fontWeight: 500 }}>{a.title}</div>}
-            {edit && <RM onClick={() => remove(a.id)} />}
-          </div>
-        ))}
-        {(edit || anchors.length === 0) && (
-          <>
-            <form style={{ display: 'flex', gap: 8 }} onSubmit={e => { e.preventDefault(); if (an.trim()) { add('ladder', { title: an.trim(), cat: ANCHOR, sub: '' }); setAn('') } }}>
-              <input type="text" placeholder="Add an anchor" value={an} onChange={e => setAn(e.target.value)} style={{ flex: 1, minWidth: 0 }} /><button className="btn small" type="submit">Add</button>
-            </form>
-            <form style={{ display: 'flex', flexDirection: 'column', gap: 8 }} onSubmit={e => { e.preventDefault(); const lines = paste.split('\n').map(x => x.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean); if (lines.length) { addMany('ladder', { cat: ANCHOR }, lines); setPaste('') } }}>
-              <textarea rows={4} placeholder="Or paste a whole list, one anchor per line" value={paste} onChange={e => setPaste(e.target.value)} style={{ width: '100%', borderRadius: 16, border: '2px solid var(--border)', padding: 12, fontSize: 16, fontFamily: 'inherit', background: 'var(--card)', color: 'var(--ink)' }} />
-              <div><button className="btn small outline" type="submit" disabled={!paste.trim()}>Add all of these</button></div>
-            </form>
-          </>
-        )}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 28, padding: '26px 28px 24px', color: '#fff', background: 'linear-gradient(135deg, var(--accent), var(--g2))', boxShadow: '0 10px 30px rgba(0,0,0,.14)' }}>
+        <svg width="190" height="190" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ position: 'absolute', right: -24, top: -22, opacity: .14 }}><circle cx="12" cy="5" r="2.200" /><path d="M12 7.200V21M7 11h10M4 15c0 3.500 3.500 6 8 6s8-2.500 8-6M4 15l2 1.500M20 15l-2 1.500" /></svg>
+        <div style={{ position: 'relative', fontSize: 13, fontWeight: 700, letterSpacing: 3, opacity: .85 }}>OUR ANCHORS · FOR LIFE</div>
+        <div style={{ position: 'relative', fontFamily: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif", fontStyle: 'italic', fontSize: 17, opacity: .92, margin: '4px 0 14px' }}>What we are building towards. Read these when you need to keep going.</div>
+        <div className="anchor-grid" style={{ position: 'relative' }}>
+          {ANCHORS.map((t, i) => (
+            <div key={t} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.22)' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, opacity: .7, width: 20, flex: 'none' }}>{String(i + 1).padStart(2, '0')}</span>
+              <span style={{ fontFamily: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif", fontSize: 21, lineHeight: 1.25 }}>{t}</span>
+            </div>
+          ))}
+        </div>
       </div>
       {pillars.length === 0 && <div className="card muted" style={{ padding: 22 }}>Tap Edit to add a big goal, like "Vietnam trip". Then break it into steps and choose which ones go on your To do list.</div>}
       {pillars.map(p => {
