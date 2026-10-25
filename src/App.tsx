@@ -11,6 +11,7 @@ import { clearErrors, getErrors, installGlobalHandlers, logError, markSeen, unse
 import { embedUrl } from './lib/embed.ts'
 import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
+import { IconView } from './CalIconArt.tsx'
 import { getCalIcons, setCalIcon, TET_ICONS, VEG_ICONS } from './lib/calIcons.ts'
 import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
 import { addMonthKey, daysInMonth, longestInMonth, monthLabel, streak, weatherText } from './lib/habits.ts'
@@ -411,6 +412,14 @@ function Schedule() {
   )
 }
 
+async function smallPng(file: File, max = 96): Promise<string> {
+  const bmp = await createImageBitmap(file)
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height))
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
+  c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height)
+  return c.toDataURL('image/png')
+}
+
 function CalendarSettings() {
   const [links, setLinks] = useState<CalLinks | null>(null)
   const [msg, setMsg] = useState('')
@@ -446,11 +455,10 @@ function CalendarSettings() {
           <div style={{ fontWeight: 600, marginBottom: 6 }}>{lab}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {opts.map(o => (
-              <button key={o} aria-pressed={icon[k] === o} onClick={() => { setCalIcon(k, o); setIcon(getCalIcons()) }} style={{ width: 54, height: 54, borderRadius: 16, fontSize: 26, border: '2.5px solid ' + (icon[k] === o ? 'var(--accent)' : 'var(--border)'), background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {o === 'leaf' ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 19C5 10 10 5 20 4c0 9-5 15-13 15z" fill="#3FA66B" stroke="#2B7D4D" strokeWidth="1.5" strokeLinejoin="round" /><path d="M5 19c3-5 6-8 10-10" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></svg>
-                  : o === 'pocket' ? <svg width="24" height="28" viewBox="0 0 24 28" fill="none"><rect x="3" y="2" width="18" height="24" rx="3" fill="#D6262B" stroke="#9E1519" strokeWidth="1.5" /><path d="M3 9c6 5 12 5 18 0" stroke="#F6C453" strokeWidth="1.5" /><circle cx="12" cy="15" r="3.5" fill="#F6C453" /></svg> : o}
-              </button>
+              <button key={o} aria-pressed={icon[k] === o} onClick={() => { setCalIcon(k, o); setIcon(getCalIcons()) }} style={{ width: 58, height: 58, borderRadius: 16, border: '2.5px solid ' + (icon[k] === o ? 'var(--accent)' : 'var(--border)'), background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconView value={o} size={30} /></button>
             ))}
+            {icon[k].startsWith('data:') && <button aria-pressed="true" style={{ width: 58, height: 58, borderRadius: 16, border: '2.5px solid var(--accent)', background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconView value={icon[k]} size={34} /></button>}
+            <label className="btn small outline" style={{ alignSelf: 'center', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>Use my own picture<input type="file" accept="image/*" hidden onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { setCalIcon(k, await smallPng(f)); setIcon(getCalIcons()) } catch (er) { logError('Calendar icon', er); setMsg('Could not use that picture.') } }} /></label>
           </div>
         </div>
       ))}
