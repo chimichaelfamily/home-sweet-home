@@ -161,3 +161,17 @@ import { vicHolidays } from './vicHolidays.ts'
   assert.strictEqual(Object.keys(h).length, 14 - 0)
   console.log('vic holiday tests passed')
 }
+
+import { parseDialogue, parseFact, wordCount } from './ktext.ts'
+{
+  const d = parseDialogue('**Sam:** Hi there!\nPriya: Hey, how was your weekend?\nSam: Great, we went to the market.\nPriya: Nice!\nTIP: Ask open questions.\nPHRASES: How was your weekend? | Sounds fun | Tell me more')
+  assert.strictEqual(d.lines.length, 4)
+  assert.strictEqual(d.lines[0].who, 'Sam')
+  assert.strictEqual(d.tip, 'Ask open questions.')
+  assert.deepStrictEqual(d.phrases, ['How was your weekend?', 'Sounds fun', 'Tell me more'])
+  const f = parseFact('FACT: Octopuses have three hearts.\nWHY: Two pump blood to the gills.', 'Nature')
+  assert.strictEqual(f.text, 'Octopuses have three hearts.')
+  assert.strictEqual(f.why, 'Two pump blood to the gills.')
+  assert.strictEqual(wordCount('  one two  three '), 3)
+  console.log('knowledge tests passed')
+}

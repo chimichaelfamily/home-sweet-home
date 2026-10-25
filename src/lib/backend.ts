@@ -112,11 +112,11 @@ export const markBackup = (ymd: string) => { try { localStorage.setItem(BK, ymd)
 export async function backupAll(core: unknown): Promise<unknown> {
   const out: Record<string, unknown> = { core, saved_at: new Date().toISOString() }
   if (supabase) {
-    for (const t of ['morning_items', 'private_items', 'products', 'weekly_notes', 'calendars']) {
+    for (const t of ['morning_items', 'private_items', 'products', 'weekly_notes', 'calendars', 'knowledge_items']) {
       const { data } = await supabase.from(t).select('*'); out[t] = data ?? []
     }
   } else {
-    for (const [k, key] of [['morning_items', 'home-sweet-home.morning.v1'], ['private_items', 'home-sweet-home.private.v1'], ['products', 'home-sweet-home.products.v1'], ['weekly_notes', 'home-sweet-home.weekly.v1']]) {
+    for (const [k, key] of [['morning_items', 'home-sweet-home.morning.v1'], ['private_items', 'home-sweet-home.private.v1'], ['products', 'home-sweet-home.products.v1'], ['weekly_notes', 'home-sweet-home.weekly.v1'], ['knowledge_items', 'home-sweet-home.knowledge.v1']]) {
       try { out[k] = JSON.parse(localStorage.getItem(key) || 'null') } catch { out[k] = null }
     }
   }

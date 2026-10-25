@@ -11,6 +11,7 @@ import { clearErrors, getErrors, installGlobalHandlers, logError, markSeen, unse
 import { embedUrl } from './lib/embed.ts'
 import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
+import { Knowledge } from './Knowledge.tsx'
 import { IconView } from './CalIconArt.tsx'
 import { getCalIcons, setCalIcon, TET_ICONS, VEG_ICONS } from './lib/calIcons.ts'
 import { fetchCalendar, scheduleDays, type CalEvent } from './lib/calendar.ts'
@@ -20,7 +21,7 @@ import { addDays, diffDays, dowShort, fmtLong, fmtShort, isoToYmd, today } from 
 import { daysLate, headsUps, nextDue, status, type Rule, type Unit } from './lib/rules.ts'
 import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Task, type Who } from './lib/types.ts'
 
-type Tab = 'home' | 'habits' | 'morning' | 'private' | 'calendar' | 'ask' | 'weekly' | 'products' | 'reminders' | 'points' | 'settings'
+type Tab = 'home' | 'habits' | 'morning' | 'private' | 'calendar' | 'ask' | 'weekly' | 'products' | 'reminders' | 'points' | 'knowledge' | 'settings'
 type Pending = { kind: 'task' | 'rule'; id: string; title: string; size: Size } | null
 const THEMES = [
   { id: 'lilac', name: 'Lilac haze', note: 'Lavender, dusty pink' },
@@ -90,11 +91,12 @@ export default function App() {
         {tab === 'private' && <Private tasks={state.tasks} onPush={title => { const r = A.addTask(state, title, 'baby'); apply(r); return r.state.tasks[r.state.tasks.length - 1].id }} />}
         <div className="keep" style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
         <div style={{ height: '100%', display: tab === 'weekly' ? 'block' : 'none' }}><Weekly s={state} /></div>
+        <div style={{ height: '100%', display: tab === 'knowledge' ? 'block' : 'none' }}><Knowledge /></div>
         {tab === 'points' && <Points s={state} apply={apply} />}
         {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} mode={mode} setMode={setMode} openSec={openSec} clearOpen={() => setOpenSec(null)} onDone={setPending} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Affirmation'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+        {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Affirmation'], ['private', 'Goals'], ['weekly', 'Report'], ['knowledge', 'Knowledge'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
         ))}
         {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenSec('errors') }}>Something went wrong: see Settings → Logs</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
