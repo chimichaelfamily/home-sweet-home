@@ -35,16 +35,22 @@ jobs:
           URL: ${{ secrets.SUPABASE_URL }}
           KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
+          base="${URL%/}"; base="${base%/rest/v1}"
           day=$(TZ=Australia/Melbourne date +%F)
           mkdir -p weekly
           out="weekly/backup-$day.json"
           echo "{\"saved_at\": \"$(date -u +%FT%TZ)\"" > "$out"
+          ok=0; bad=0
           for t in people tasks rules point_events snoozes habits habit_logs calendars morning_items private_items products weekly_notes knowledge_items knowledge_bank; do
-            body=$(curl -sf "$URL/rest/v1/$t?select=*" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" || echo '"missing"')
-            printf ', "%s": %s' "$t" "$body" >> "$out"
+            code=$(curl -s -o body.json -w "%{http_code}" "$base/rest/v1/$t?select=*" -H "apikey: $KEY")
+            if [ "$code" = "401" ]; then code=$(curl -s -o body.json -w "%{http_code}" "$base/rest/v1/$t?select=*" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"); fi
+            if [ "$code" = "200" ]; then printf ', "%s": ' "$t" >> "$out"; cat body.json >> "$out"; ok=$((ok+1)); echo "$t: ok"
+            else echo "$t: failed with HTTP $code $(head -c 200 body.json)"; bad=$((bad+1)); fi
           done
           echo "}" >> "$out"
-          python3 -c "import json,sys; d=json.load(open('$out')); print({k: (len(v) if isinstance(v, list) else v) for k, v in d.items()})"
+          rm -f body.json
+          if [ "$ok" = "0" ]; then echo "Nothing could be read. Check SUPABASE_URL (https://xxxx.supabase.co) and SUPABASE_SERVICE_KEY."; rm -f "$out"; exit 1; fi
+          python3 -c "import json; d=json.load(open('$out')); print({k: (len(v) if isinstance(v, list) else v) for k, v in d.items()})"
       - name: Save to GitHub
         run: |
           git add -A
