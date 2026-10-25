@@ -75,7 +75,7 @@ function Inside({ onLock, tasks, onPush, demo = false }: { onLock: () => void; t
         {sub === 'anchors' && <Anchors list={demo ? DEMO_ANCHORS : undefined} />}
         {sub === 'goals' && <Goals pillars={of('pillar')} steps={of('step')} tasks={tasks} onPush={onPush} demo={demo} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'vision' && <Vision counts={of('countdown')} pins={of('pin')} edit={edit} add={add} upsert={upsert} remove={remove} />}
-        {sub === 'money' && <Money rows={of('money')} edit={edit} add={add} upsert={upsert} remove={remove} />}
+        {sub === 'money' && <Money rows={of('money')} step={demo ? 1 : 500} edit={edit} add={add} upsert={upsert} remove={remove} />}
       </div>
     </div>
   )
@@ -206,8 +206,8 @@ function Vision({ counts, pins, edit, add, upsert, remove }: { counts: PItem[]; 
 }
 
 /** Add to or take away from the amount saved, by 500 or any number you type. */
-function Adjust({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [amt, setAmt] = useState('500')
+function Adjust({ value, onChange, start }: { value: number; onChange: (v: number) => void; start: number }) {
+  const [amt, setAmt] = useState(String(start))
   const a = Math.abs(Number(amt)) || 0
   const bump = (sign: 1 | -1) => { if (a > 0) onChange(Math.max(0, Math.round((value + sign * a) * 100) / 100)) }
   const round = { width: 34, height: 34, borderRadius: '50%', fontSize: 20, fontWeight: 600, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 } as const
@@ -223,7 +223,7 @@ function Adjust({ value, onChange }: { value: number; onChange: (v: number) => v
   )
 }
 
-function Money({ rows, edit, add, upsert, remove }: { rows: PItem[] } & Ops) {
+function Money({ rows, step, edit, add, upsert, remove }: { rows: PItem[]; step: number } & Ops) {
   const [n, setN] = useState(''); const [t, setT] = useState(''); const [y, setY] = useState(String(new Date().getFullYear() + 1)); const [sv, setSv] = useState('')
   const years = [...new Set(rows.map(r => r.cat))].sort()
   return (
@@ -248,7 +248,7 @@ function Money({ rows, edit, add, upsert, remove }: { rows: PItem[] } & Ops) {
                 <div style={{ height: 12, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 12, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                   <div className="muted" style={{ fontSize: 14 }}>{left > 0 ? `${money(per)} a month until Dec ${yr}` : 'Reached!'}</div>
-                  {!edit && <Adjust value={r.num1} onChange={v => upsert({ ...r, num1: v })} />}
+                  {!edit && <Adjust start={step} value={r.num1} onChange={v => upsert({ ...r, num1: v })} />}
                 </div>
                 {edit && (
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 4 }}>
