@@ -1,12 +1,13 @@
 import { Credit, PhotoPicker } from './PhotoPicker.tsx'
 import { logError } from './lib/errorlog.ts'
+import type { Task } from './lib/types.ts'
 import { useEffect, useRef, useState } from 'react'
 import { daysUntil, lockRegister, lockRegistered, lockReset, lockSupported, lockUnlock, loadPrivate, money, monthsTo, savePrivate, type Kind, type PItem } from './lib/privateData.ts'
 
 const IDLE_MS = 2 * 60 * 1000
 type Sub = 'goals' | 'vision' | 'money'
 
-export function Private() {
+export function Private({ tasks, onPush }: { tasks: Task[]; onPush: (title: string) => string }) {
   const [unlocked, setUnlocked] = useState(false)
   const [registered, setRegistered] = useState(lockRegistered())
   const [msg, setMsg] = useState('')
@@ -28,7 +29,7 @@ export function Private() {
     catch { setMsg(setup ? 'Setup was cancelled or not allowed. Try again.' : 'Face ID did not match. Try again.') }
   }
 
-  if (unlocked) return <Inside onLock={() => setUnlocked(false)} />
+  if (unlocked) return <Inside onLock={() => setUnlocked(false)} tasks={tasks} onPush={onPush} />
   return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="card" style={{ width: 520, padding: 36, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -44,14 +45,14 @@ export function Private() {
   )
 }
 
-function Inside({ onLock }: { onLock: () => void }) {
+function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; onPush: (title: string) => string }) {
   const [sub, setSub] = useState<Sub>('goals')
   const [items, setItems] = useState<PItem[]>([])
   const [err, setErr] = useState('')
   const [edit, setEdit] = useState(false)
   useEffect(() => { loadPrivate().then(setItems).catch(() => { logError('Goals: loading', 'Could not load. Has 005_private.sql been run?'); setErr('Could not load. Has 005_private.sql been run?') }) }, [])
   const of = (k: Kind) => items.filter(x => x.kind === k).sort((a, b) => a.sort - b.sort)
-  const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); savePrivate(next, { upsert: it }).catch(() => { logError('Goals: saving', 'Could not save. Has 005_private.sql been run?'); setErr('Could not save. Has 005_private.sql been run?') }) }
+  const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); savePrivate(next, { upsert: it }).catch(() => { logError('Goals: saving', 'Could not save. Have 005_private.sql and 011_goal_steps.sql been run?'); setErr('Could not save. Have 005_private.sql and 011_goal_steps.sql been run?') }) }
   const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); savePrivate(next, { remove: id }).catch(() => setErr('Could not remove.')) }
   const add = (kind: Kind, f: Partial<PItem>) => { const l = of(kind); upsert({ id: `${kind}-${Date.now().toString(36)}`, kind, title: '', sub: '', cat: '', num1: 0, num2: 0, day: null, sort: (l[l.length - 1]?.sort ?? 0) + 1, ...f }) }
   return (
@@ -67,7 +68,7 @@ function Inside({ onLock }: { onLock: () => void }) {
       </div>
       {err && <div style={{ fontSize: 14 }}>{err}</div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
-        {sub === 'goals' && <Goals pillars={of('pillar')} ladder={of('ladder')} edit={edit} add={add} upsert={upsert} remove={remove} />}
+        {sub === 'goals' && <Goals pillars={of('pillar')} ladder={of('ladder')} steps={of('step')} tasks={tasks} onPush={onPush} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'vision' && <Vision counts={of('countdown')} pins={of('pin')} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'money' && <Money rows={of('money')} edit={edit} add={add} upsert={upsert} remove={remove} />}
       </div>
@@ -78,38 +79,71 @@ function Inside({ onLock }: { onLock: () => void }) {
 interface Ops { edit: boolean; add: (k: Kind, f: Partial<PItem>) => void; upsert: (i: PItem) => void; remove: (id: string) => void }
 const RM = ({ onClick }: { onClick: () => void }) => <button className="btn small outline" onClick={onClick}>Remove</button>
 const WHENS = ['10 YEARS', 'THIS YEAR', 'THIS QUARTER', 'THIS MONTH', 'THIS WEEK']
-const STATUS = ['To define', 'Next', 'In progress', 'Suggested', 'Done']
 
-function Goals({ pillars, ladder, edit, add, upsert, remove }: { pillars: PItem[]; ladder: PItem[] } & Ops) {
-  const [pt, setPt] = useState(''); const [lt, setLt] = useState(''); const [lw, setLw] = useState(WHENS[1])
-  const sorted = [...ladder].sort((a, b) => WHENS.indexOf(a.cat) - WHENS.indexOf(b.cat))
+function Goals({ pillars, ladder, steps, tasks, onPush, edit, add, upsert, remove }: { pillars: PItem[]; ladder: PItem[]; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string } & Ops) {
+  const [pt, setPt] = useState('')
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [openTl, setOpenTl] = useState(false)
+  const sortedLadder = [...ladder].sort((a, b) => WHENS.indexOf(a.cat) - WHENS.indexOf(b.cat))
+  const taskOf = (st: PItem) => (st.sub.startsWith('task:') ? tasks.find(t => t.id === st.sub.slice(5)) : undefined)
+  const isDone = (st: PItem) => st.num1 === 1 || !!taskOf(st)?.done_at
+  const inTodo = (st: PItem) => { const t = taskOf(st); return !!t && !t.done_at }
   return (
-    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-      <div className="card" style={{ flex: 1, padding: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontSize: 22, fontWeight: 600 }}>Big picture</div>
-        {pillars.length === 0 && <div className="muted">Add your big goals, like "Live free" or "Our home".</div>}
-        {pillars.map(p => (
-          <div key={p.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 600 }}><span>{p.title}</span><span>{Math.round(p.num1)}%</span></div>
-            <div style={{ height: 10, borderRadius: 10, background: 'var(--faint)', marginTop: 6 }}><div style={{ height: 10, borderRadius: 10, width: `${Math.min(100, p.num1)}%`, background: 'var(--accent)' }} /></div>
-            {edit && <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><input type="number" min={0} max={100} aria-label="Percent" defaultValue={p.num1} onBlur={e => upsert({ ...p, num1: Number(e.target.value) || 0 })} style={{ width: 100 }} /><RM onClick={() => remove(p.id)} /></div>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {pillars.length === 0 && <div className="card muted" style={{ padding: 22 }}>Add a big goal below, like "Vietnam trip". Then break it into steps and choose which ones go on your To do list.</div>}
+      {pillars.map(p => {
+        const mine = steps.filter(x => x.cat === p.id).sort((a, b) => a.sort - b.sort)
+        const done = mine.filter(isDone).length
+        const pct = mine.length ? Math.round((done / mine.length) * 100) : Math.min(100, Math.round(p.num1))
+        const draft = drafts[p.id] ?? ''
+        return (
+          <div key={p.id} className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {edit ? <input type="text" aria-label="Goal name" defaultValue={p.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== p.title) upsert({ ...p, title: v }) }} style={{ width: '100%' }} />
+                  : <div style={{ fontSize: 24, fontWeight: 600 }}>{p.title}</div>}
+                <div className="muted" style={{ fontSize: 14 }}>{mine.length ? `${done} of ${mine.length} steps done` : 'No steps yet'}</div>
+              </div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: 'var(--accent)' }}>{pct}%</div>
+            </div>
+            <div style={{ height: 12, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 12, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
+            {edit && mine.length === 0 && <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><label className="muted" style={{ fontSize: 13 }}>Progress %</label><input type="number" min={0} max={100} aria-label="Percent" defaultValue={p.num1} onBlur={e => upsert({ ...p, num1: Math.min(100, Number(e.target.value) || 0) })} style={{ width: 100 }} /></div>}
+            {mine.map(st => {
+              const d = isDone(st); const t = inTodo(st)
+              return (
+                <div key={st.id} className="row" style={{ minHeight: 48 }}>
+                  <button className={'circle' + (d ? ' done' : '')} aria-label={d ? `Mark "${st.title}" not done` : `Mark "${st.title}" done`} style={{ width: 28, height: 28 }} onClick={() => upsert({ ...st, num1: d ? 0 : 1 })}>{d && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.500l4.500 4.500L19 7" /></svg>}</button>
+                  <div style={{ flex: 1, fontSize: 17, ...(d ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{st.title}</div>
+                  {!d && (t ? <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>In To do</span>
+                    : <button className="btn small outline" style={{ height: 36, fontSize: 14 }} onClick={() => { const id = onPush(st.title); upsert({ ...st, sub: 'task:' + id }) }}>+ To do</button>)}
+                  {edit && <RM onClick={() => remove(st.id)} />}
+                </div>
+              )
+            })}
+            <form style={{ display: 'flex', gap: 8 }} onSubmit={e => { e.preventDefault(); const v = draft.trim(); if (v) { add('step', { title: v, cat: p.id, sort: (mine[mine.length - 1]?.sort ?? 0) + 1 }); setDrafts({ ...drafts, [p.id]: '' }) } }}>
+              <input type="text" placeholder="Add a step, e.g. Book tickets" value={draft} onChange={e => setDrafts({ ...drafts, [p.id]: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
+              <button className="btn small" type="submit">Add step</button>
+            </form>
+            {edit && <div><RM onClick={() => { if (confirm(`Remove "${p.title}" and its steps?`)) { mine.forEach(x => remove(x.id)); remove(p.id) } }} /></div>}
           </div>
-        ))}
-        {edit && <form style={{ display: 'flex', gap: 8 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pillar', { title: pt.trim() }); setPt('') } }}><input type="text" placeholder="New big goal" value={pt} onChange={e => setPt(e.target.value)} /><button className="btn small" type="submit">Add</button></form>}
-      </div>
-      <div className="card" style={{ flex: 1.2, padding: 22, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 22, fontWeight: 600 }}>From 10 years to this week</div>
-        {ladder.length === 0 && <div className="muted">Add steps from far away to this week.</div>}
-        {sorted.map(l => (
-          <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 60, borderBottom: '1px solid var(--border)' }}>
-            <div className="muted" style={{ width: 110, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>{l.cat}</div>
-            <div style={{ flex: 1, fontSize: 18, fontWeight: 600 }}>{l.title}</div>
-            {edit ? <><select aria-label="Status" value={l.sub} onChange={e => upsert({ ...l, sub: e.target.value })}>{STATUS.map(x => <option key={x}>{x}</option>)}</select><RM onClick={() => remove(l.id)} /></>
-              : <span style={{ fontSize: 13, fontWeight: 600, padding: '4px 12px', borderRadius: 999, border: '1.5px solid var(--mborder)' }}>{l.sub || 'Next'}</span>}
-          </div>
-        ))}
-        {edit && <form style={{ display: 'flex', gap: 8 }} onSubmit={e => { e.preventDefault(); if (lt.trim()) { add('ladder', { title: lt.trim(), cat: lw, sub: 'Next' }); setLt('') } }}><select aria-label="When" value={lw} onChange={e => setLw(e.target.value)}>{WHENS.map(x => <option key={x}>{x}</option>)}</select><input type="text" placeholder="New step" value={lt} onChange={e => setLt(e.target.value)} /><button className="btn small" type="submit">Add</button></form>}
-      </div>
+        )
+      })}
+      <form className="card" style={{ display: 'flex', gap: 8, padding: 16 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pillar', { title: pt.trim() }); setPt('') } }}>
+        <input type="text" placeholder="New big goal, e.g. Vietnam trip" value={pt} onChange={e => setPt(e.target.value)} style={{ flex: 1, minWidth: 0 }} /><button className="btn small" type="submit">Add goal</button>
+      </form>
+      {sortedLadder.length > 0 && (
+        <div className="card" style={{ padding: '14px 22px' }}>
+          <button onClick={() => setOpenTl(!openTl)} style={{ background: 'none', border: 'none', fontSize: 17, fontWeight: 600, padding: 0 }}>{openTl ? '▾' : '▸'} Old timeline ({sortedLadder.length})</button>
+          {openTl && sortedLadder.map(l => (
+            <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 50, borderBottom: '1px solid var(--border)' }}>
+              <div className="muted" style={{ width: 110, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>{l.cat}</div>
+              <div style={{ flex: 1, fontSize: 16, fontWeight: 600 }}>{l.title}</div>
+              <span className="muted" style={{ fontSize: 13 }}>{l.sub || 'Next'}</span>
+              {edit && <RM onClick={() => remove(l.id)} />}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -117,35 +151,52 @@ function Goals({ pillars, ladder, edit, add, upsert, remove }: { pillars: PItem[
 const CATS = ['Love', 'Money', 'Travel', 'Health', 'Home', 'Career']
 function Vision({ counts, pins, edit, add, upsert, remove }: { counts: PItem[]; pins: PItem[] } & Ops) {
   const [ct, setCt] = useState(''); const [cd, setCd] = useState(''); const [pt, setPt] = useState(''); const [pc, setPc] = useState(CATS[0]); const [f, setF] = useState('All'); const [pick, setPick] = useState<string | null>(null)
+  const [big, setBig] = useState<string | null>(null)
   const cs = [...counts].filter(c => c.day).sort((a, b) => a.day!.localeCompare(b.day!))
+  const shown = pins.filter(p => f === 'All' || p.cat === f)
+  const bigPin = pins.find(x => x.id === big)
+  const tint = (i: number) => `linear-gradient(135deg, hsl(${(i * 47 + 280) % 360} 35% 55%), hsl(${(i * 47 + 330) % 360} 40% 42%))`
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {pick && (() => { const pin = pins.find(x => x.id === pick); return pin ? <PhotoPicker initial={pin.title} onPick={(img, credit) => { upsert({ ...pin, img, sub: img && credit ? credit : '' }); setPick(null) }} onClose={() => setPick(null)} /> : null })()}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {cs.map((c, i) => { const n = daysUntil(c.day!); return (
-          <div key={c.id} className="card" style={{ minWidth: 220, padding: '14px 20px', ...(i === 0 ? { background: 'var(--accent)', color: 'var(--on-accent)' } : {}) }}>
-            <div style={{ fontSize: 17, fontWeight: 600 }}>{c.title}</div>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{n > 0 ? `in ${n} days` : n === 0 ? 'Today!' : `${-n} days ago`}</div>
-            {edit && <div style={{ marginTop: 6 }}><RM onClick={() => remove(c.id)} /></div>}
-          </div>) })}
-        {cs.length === 0 && <div className="muted">Add countdowns, like "Christmas tree goes up".</div>}
-      </div>
+      {bigPin && (
+        <div className="overlay" onClick={() => setBig(null)} style={{ zIndex: 30, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ maxWidth: 'min(94vw, 900px)', maxHeight: '92dvh', borderRadius: 24, overflow: 'hidden', background: 'var(--card)', display: 'flex', flexDirection: 'column' }}>
+            {bigPin.img && <img src={bigPin.img} alt={bigPin.title} style={{ width: '100%', maxHeight: '74dvh', objectFit: 'contain', background: '#000' }} />}
+            <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}><div className="muted" style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{bigPin.cat.toUpperCase()}</div><div style={{ fontSize: 22, fontWeight: 600 }}>{bigPin.title}</div>{bigPin.img && <Credit credit={bigPin.sub} />}</div>
+              <button className="btn small" onClick={() => setBig(null)}>Close</button>
+            </div>
+          </div>
+        </div>)}
+      {cs.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+          {cs.map((c, i) => { const n = daysUntil(c.day!); return (
+            <div key={c.id} style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', borderRadius: 999, border: '1.5px solid ' + (i === 0 ? 'var(--accent)' : 'var(--border)'), background: i === 0 ? 'var(--accent)' : 'var(--card)', color: i === 0 ? 'var(--on-accent)' : 'var(--ink)' }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{c.title}</span>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>{n > 0 ? `${n} days` : n === 0 ? 'Today!' : `${-n}d ago`}</span>
+              {edit && <button aria-label={`Remove ${c.title}`} onClick={() => remove(c.id)} style={{ border: 'none', background: 'transparent', color: 'inherit', fontSize: 18, padding: 0 }}>×</button>}
+            </div>) })}
+        </div>)}
       {edit && <form style={{ display: 'flex', gap: 8, maxWidth: 640 }} onSubmit={e => { e.preventDefault(); if (ct.trim() && cd) { add('countdown', { title: ct.trim(), day: cd }); setCt(''); setCd('') } }}><input type="text" placeholder="New countdown" value={ct} onChange={e => setCt(e.target.value)} /><input type="date" aria-label="Date" value={cd} onChange={e => setCd(e.target.value)} /><button className="btn small" type="submit">Add</button></form>}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {['All', ...CATS].map(c => <button key={c} onClick={() => setF(c)} style={{ height: 40, padding: '0 16px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: '1.5px solid var(--mborder)', background: f === c ? 'var(--accent)' : 'transparent', color: f === c ? 'var(--on-accent)' : 'var(--ink)' }}>{c}</button>)}
+      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999, alignSelf: 'flex-start', overflowX: 'auto', maxWidth: '100%' }}>
+        {['All', ...CATS].map(c => <button key={c} onClick={() => setF(c)} style={{ flex: 'none', height: 38, padding: '0 16px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: 'none', background: f === c ? 'var(--accent)' : 'transparent', color: f === c ? 'var(--on-accent)' : 'var(--ink)' }}>{c}</button>)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        {pins.filter(p => f === 'All' || p.cat === f).map((p, i) => (
-          <div key={p.id} style={{ minHeight: 150, borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.45)', background: p.img ? `linear-gradient(transparent 35%, rgba(0,0,0,.6)), center / cover url("${p.img}")` : `linear-gradient(135deg, hsl(${(i * 47 + 280) % 360} 35% 55%), hsl(${(i * 47 + 330) % 360} 40% 42%))` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, opacity: .85 }}>{p.cat.toUpperCase()}</div>
-            <div style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.2 }}>{p.title}</div>
-            {p.img && <Credit credit={p.sub} />}
-            {edit && <div style={{ marginTop: 8, display: 'flex', gap: 6 }}><button className="btn small outline" onClick={() => setPick(p.id)}>{p.img ? 'Change photo' : 'Add photo'}</button><RM onClick={() => remove(p.id)} /></div>}
+      {shown.length === 0 && <div className="muted">Nothing here yet. Tap Edit and add something you want in your life.</div>}
+      <div className="photo-wall">
+        {shown.map((p, i) => (
+          <div key={p.id} className="wall-tile" style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', cursor: edit ? 'default' : 'pointer', background: p.img ? '#222' : tint(i), minHeight: p.img ? undefined : 150 + (i % 3) * 30 }} onClick={() => { if (!edit) setBig(p.id) }}>
+            {p.img && <img src={p.img} alt={p.title} style={{ display: 'block', width: '100%', height: 'auto' }} />}
+            <div style={{ position: p.img ? 'absolute' : 'static', inset: p.img ? 'auto 0 0 0' : undefined, padding: '26px 14px 12px', color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.5)', background: p.img ? 'linear-gradient(transparent, rgba(0,0,0,.65))' : 'none', ...(p.img ? {} : { height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 150 }) }}>
+              <div style={{ fontSize: 11, fontWeight: 700, opacity: .85, letterSpacing: 1 }}>{p.cat.toUpperCase()}</div>
+              <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>{p.title}</div>
+              {p.img && <Credit credit={p.sub} />}
+              {edit && <div style={{ marginTop: 8, display: 'flex', gap: 6 }}><button className="btn small outline" onClick={e => { e.stopPropagation(); setPick(p.id) }}>{p.img ? 'Change photo' : 'Add photo'}</button><RM onClick={() => remove(p.id)} /></div>}
+            </div>
           </div>
         ))}
       </div>
       {edit && <form style={{ display: 'flex', gap: 8, maxWidth: 640 }} onSubmit={e => { e.preventDefault(); if (pt.trim()) { add('pin', { title: pt.trim(), cat: pc }); setPt('') } }}><input type="text" placeholder="New vision, e.g. A garden full of flowers" value={pt} onChange={e => setPt(e.target.value)} /><select aria-label="Category" value={pc} onChange={e => setPc(e.target.value)}>{CATS.map(c => <option key={c}>{c}</option>)}</select><button className="btn small" type="submit">Add</button></form>}
-      <div className="muted" style={{ fontSize: 13 }}>In Edit, tap Add photo on a card to search free photos or use one from your iPad.</div>
     </div>
   )
 }

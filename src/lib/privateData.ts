@@ -1,6 +1,6 @@
 import { supabase } from './backend.ts'
 
-export type Kind = 'pillar' | 'ladder' | 'pin' | 'countdown' | 'money'
+export type Kind = 'pillar' | 'ladder' | 'step' | 'pin' | 'countdown' | 'money'
 export interface PItem { id: string; kind: Kind; title: string; sub: string; cat: string; num1: number; num2: number; day: string | null; sort: number; img?: string }
 const KEY = 'home-sweet-home.private.v1'
 export async function loadPrivate(): Promise<PItem[]> {

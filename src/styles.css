@@ -181,3 +181,8 @@ html[data-mode='dark'] .toast { background: #F2EDF9; color: #201C2B; }
   .theme-row { flex-direction: column !important; }
   .cols > .card.scroll { padding: 16px !important; }
 }
+
+.photo-wall { column-count: 3; column-gap: 12px; }
+.wall-tile { break-inside: avoid; margin-bottom: 12px; }
+@media (max-width: 900px) { .photo-wall { column-count: 2; } }
+@media (max-width: 420px) { .photo-wall { column-count: 1; } }

@@ -87,7 +87,7 @@ export default function App() {
         {tab === 'habits' && <Habits s={state} apply={apply} />}
         {tab === 'calendar' && <MonthCalendar />}
         {tab === 'morning' && <Morning />}
-        {tab === 'private' && <Private />}
+        {tab === 'private' && <Private tasks={state.tasks} onPush={title => { const r = A.addTask(state, title, 'baby'); apply(r); return r.state.tasks[r.state.tasks.length - 1].id }} />}
         <div className="keep" style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
         <div style={{ height: '100%', display: tab === 'weekly' ? 'block' : 'none' }}><Weekly s={state} /></div>
         {tab === 'points' && <Points s={state} apply={apply} />}
