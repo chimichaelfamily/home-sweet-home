@@ -1,12 +1,12 @@
 import { Credit, PhotoPicker } from './PhotoPicker.tsx'
 import { logError } from './lib/errorlog.ts'
 import type { Task } from './lib/types.ts'
-import { ANCHORS } from './lib/anchors.ts'
+import { Anchors } from './Anchors.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { daysUntil, lockRegister, lockRegistered, lockReset, lockSupported, lockUnlock, loadPrivate, money, monthsTo, savePrivate, type Kind, type PItem } from './lib/privateData.ts'
 
 const IDLE_MS = 2 * 60 * 1000
-type Sub = 'goals' | 'vision' | 'money'
+type Sub = 'anchors' | 'goals' | 'vision' | 'money'
 
 export function Private({ tasks, onPush }: { tasks: Task[]; onPush: (title: string) => string }) {
   const [unlocked, setUnlocked] = useState(false)
@@ -47,7 +47,7 @@ export function Private({ tasks, onPush }: { tasks: Task[]; onPush: (title: stri
 }
 
 function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; onPush: (title: string) => string }) {
-  const [sub, setSub] = useState<Sub>('goals')
+  const [sub, setSub] = useState<Sub>('anchors')
   const [items, setItems] = useState<PItem[]>([])
   const [err, setErr] = useState('')
   const [edit, setEdit] = useState(false)
@@ -58,17 +58,18 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
   const add = (kind: Kind, f: Partial<PItem>) => { const l = of(kind); upsert({ id: `${kind}-${Date.now().toString(36)}`, kind, title: '', sub: '', cat: '', num1: 0, num2: 0, day: null, sort: (l[l.length - 1]?.sort ?? 0) + 1, ...f }) }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="mc-head" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Goals</div>
-        <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
-          {([['goals', 'Goals'], ['vision', 'Vision board'], ['money', 'Money magic']] as [Sub, string][]).map(([k, l]) => <button key={k} onClick={() => setSub(k)} style={{ height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: sub === k ? 'var(--accent)' : 'transparent', color: sub === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+        <div className="sub-tabs" style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
+          {([['anchors', 'Anchors'], ['goals', 'Goals'], ['vision', 'Vision board'], ['money', 'Money magic']] as [Sub, string][]).map(([k, l]) => <button key={k} onClick={() => setSub(k)} style={{ height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: sub === k ? 'var(--accent)' : 'transparent', color: sub === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
         </div>
         <div style={{ flex: 1 }} />
-        <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>
+        {sub !== 'anchors' && <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>}
         <button className="btn small" onClick={onLock}>Lock</button>
       </div>
       {err && <div style={{ fontSize: 14 }}>{err}</div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
+        {sub === 'anchors' && <Anchors />}
         {sub === 'goals' && <Goals pillars={of('pillar')} steps={of('step')} tasks={tasks} onPush={onPush} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'vision' && <Vision counts={of('countdown')} pins={of('pin')} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'money' && <Money rows={of('money')} edit={edit} add={add} upsert={upsert} remove={remove} />}
@@ -88,14 +89,6 @@ function Goals({ pillars, steps, tasks, onPush, edit, add, upsert, remove }: { p
   const inTodo = (st: PItem) => { const t = taskOf(st); return !!t && !t.done_at }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ borderRadius: 28, padding: '26px 24px', textAlign: 'center', background: 'color-mix(in srgb, var(--accent) 9%, var(--card))', border: '1px solid color-mix(in srgb, var(--accent) 28%, var(--border))' }}>
-        {ANCHORS.map((t, i) => (
-          <div key={t}>
-            {i > 0 && <svg width="9" height="9" viewBox="0 0 12 12" aria-hidden="true" style={{ display: 'block', margin: '9px auto', opacity: .45 }}><path d="M6 0l6 6-6 6-6-6z" fill="var(--accent)" /></svg>}
-            <div style={{ fontFamily: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif", fontStyle: 'italic', fontSize: 22, lineHeight: 1.3, color: 'var(--ink)' }}>{t}</div>
-          </div>
-        ))}
-      </div>
       {pillars.length === 0 && <div className="card muted" style={{ padding: 22 }}>Tap Edit to add a big goal, like "Vietnam trip". Then break it into steps and choose which ones go on your To do list.</div>}
       {pillars.map(p => {
         const mine = steps.filter(x => x.cat === p.id).sort((a, b) => a.sort - b.sort)
