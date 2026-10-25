@@ -39,7 +39,7 @@ export function Private({ tasks, onPush }: { tasks: Task[]; onPush: (title: stri
         <div style={{ fontSize: 34, fontWeight: 600 }}>Goals</div>
         <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Goals, vision board and money.</div>
         {!lockSupported() && <div style={{ fontSize: 15 }}>This browser does not support Face ID passkeys. Open the app from the Home Screen icon in Safari.</div>}
-        {lockSupported() && registered && <button className="btn" onClick={go}>Unlock with Face ID</button>}
+        {lockSupported() && registered && <button className="btn" onClick={go}>Smile to unlock</button>}
         {lockSupported() && !registered && <div className="muted" style={{ fontSize: 15 }}>Face ID is not set up on this device yet. Settings → Face ID.</div>}
         {msg && <div style={{ fontSize: 15 }}>{msg}</div>}
         <button className="btn outline" onClick={() => setGuest(true)}>Guest view</button>
