@@ -62,7 +62,7 @@ function Inside({ onLock, tasks, onPush, demo = false }: { onLock: () => void; t
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="mc-head" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Goals</div>
-        {demo && <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>Guest view</span>}
+        {demo && <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: 'var(--muted)', alignSelf: 'flex-end', marginBottom: 8, marginLeft: -4 }}>GUEST VIEW</span>}
         <div className="sub-tabs" style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
           {([['anchors', 'Anchors'], ['goals', 'Goals'], ['vision', 'Vision board'], ['money', 'Money magic']] as [Sub, string][]).map(([k, l]) => <button key={k} onClick={() => setSub(k)} style={{ height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: sub === k ? 'var(--accent)' : 'transparent', color: sub === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
         </div>
