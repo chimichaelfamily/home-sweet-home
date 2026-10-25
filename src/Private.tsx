@@ -155,13 +155,13 @@ function Adjust({ value, onChange }: { value: number; onChange: (v: number) => v
   const [amt, setAmt] = useState('500')
   const a = Math.abs(Number(amt)) || 0
   const bump = (sign: 1 | -1) => { if (a > 0) onChange(Math.max(0, Math.round((value + sign * a) * 100) / 100)) }
-  const round = { width: 52, height: 52, borderRadius: '50%', fontSize: 28, fontWeight: 600, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 } as const
+  const round = { width: 34, height: 34, borderRadius: '50%', fontSize: 20, fontWeight: 600, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 } as const
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
       <button className="btn outline" aria-label={`Take away ${a} dollars`} style={round} onClick={() => bump(-1)}>−</button>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, height: 52, padding: '0 14px', borderRadius: 16, border: '2px solid var(--border)', background: 'var(--card)' }}>
-        <span style={{ fontSize: 20, fontWeight: 600 }}>$</span>
-        <input type="number" inputMode="decimal" aria-label="Amount" value={amt} onChange={e => setAmt(e.target.value)} style={{ width: 90, height: 40, border: 'none', padding: 0, fontSize: 20, fontWeight: 600, background: 'transparent' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 34, padding: '0 10px', borderRadius: 12, border: '1.5px solid var(--border)', background: 'var(--card)' }}>
+        <span style={{ fontSize: 15, fontWeight: 600 }}>$</span>
+        <input type="number" inputMode="decimal" aria-label="Amount" value={amt} onChange={e => setAmt(e.target.value)} style={{ width: 62, height: 30, border: 'none', padding: 0, fontSize: 15, fontWeight: 600, background: 'transparent' }} />
       </div>
       <button className="btn" aria-label={`Add ${a} dollars`} style={round} onClick={() => bump(1)}>+</button>
     </div>
@@ -182,7 +182,7 @@ function Money({ rows, edit, add, upsert, remove }: { rows: PItem[] } & Ops) {
             const pct = r.num2 > 0 ? Math.min(100, Math.round(r.num1 / r.num2 * 100)) : 0
             const left = Math.max(0, r.num2 - r.num1); const per = left / monthsTo(Number(yr))
             return (
-              <div key={r.id} className="card" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div key={r.id} className="card" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 20, fontWeight: 600 }}>{r.title}</div>
@@ -191,8 +191,10 @@ function Money({ rows, edit, add, upsert, remove }: { rows: PItem[] } & Ops) {
                   <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--accent)' }}>{pct}%</div>
                 </div>
                 <div style={{ height: 12, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 12, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
-                <div className="muted" style={{ fontSize: 14 }}>{left > 0 ? `${money(per)} a month until Dec ${yr}` : 'Reached!'}</div>
-                {!edit && <Adjust value={r.num1} onChange={v => upsert({ ...r, num1: v })} />}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <div className="muted" style={{ fontSize: 14 }}>{left > 0 ? `${money(per)} a month until Dec ${yr}` : 'Reached!'}</div>
+                  {!edit && <Adjust value={r.num1} onChange={v => upsert({ ...r, num1: v })} />}
+                </div>
                 {edit && (
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 4 }}>
                     <label style={{ flex: '2 1 180px' }}>Goal name<input type="text" defaultValue={r.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== r.title) upsert({ ...r, title: v }) }} style={{ width: '100%' }} /></label>
