@@ -44,7 +44,7 @@ export default function App() {
   const dark = useDark(mode)
   useEffect(() => { document.documentElement.dataset.mode = dark ? 'dark' : 'light'; try { localStorage.setItem('hsh.mode', mode) } catch { /* ignore */ } }, [dark, mode])
   const [errs, setErrs] = useState(unseenCount())
-  const [openErrors, setOpenErrors] = useState(false)
+  const [openSec, setOpenSec] = useState<'errors' | 'reminders' | null>(null)
   useEffect(() => { installGlobalHandlers(); const f = () => setErrs(unseenCount()); window.addEventListener('hsh-errors', f); return () => window.removeEventListener('hsh-errors', f) }, [])
 
   useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem('hsh.theme', theme) } catch { /* ignore */ } }, [theme])
@@ -83,22 +83,21 @@ export default function App() {
     <div className="app">
       {error && <div className="card" style={{ padding: '10px 18px', color: 'var(--late)', fontWeight: 600 }}>{error} <button className="btn small outline" onClick={() => setError(null)}>Dismiss</button></div>}
       <div className="main">
-        {tab === 'home' && <Home s={state} apply={apply} onEdit={setEditing} onEditRule={setEditingRule} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => setTab('reminders')} />}
+        {tab === 'home' && <Home s={state} apply={apply} onEdit={setEditing} onEditRule={setEditingRule} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => { setTab('settings'); setOpenSec('reminders') }} />}
         {tab === 'habits' && <Habits s={state} apply={apply} />}
         {tab === 'calendar' && <MonthCalendar />}
         {tab === 'morning' && <Morning />}
         {tab === 'private' && <Private />}
         <div className="keep" style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
         <div style={{ height: '100%', display: tab === 'weekly' ? 'block' : 'none' }}><Weekly s={state} /></div>
-        {tab === 'reminders' && <Reminders s={state} apply={apply} onDone={setPending} />}
         {tab === 'points' && <Points s={state} apply={apply} />}
-        {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} mode={mode} setMode={setMode} openErrors={openErrors} clearOpen={() => setOpenErrors(false)} />}
+        {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} mode={mode} setMode={setMode} openSec={openSec} clearOpen={() => setOpenSec(null)} onDone={setPending} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Affirmation'], ['reminders', 'Reminders'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+        {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Affirmation'], ['private', 'Goals'], ['weekly', 'Report'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
         ))}
-        {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenErrors(true) }}>Something went wrong: see Settings → Logs</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
+        {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenSec('errors') }}>Something went wrong: see Settings → Logs</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : backupDue() ? 'Backup due: Settings → Backup' : ''}</span>}
       </nav>
       {adding && <AddTask onClose={() => setAdding(false)} onAdd={async (t, sz) => { setAdding(false); if (stateRef.current) await apply(A.addTask(stateRef.current, t, sz)) }} />}
       {editing && (() => {
@@ -636,7 +635,7 @@ function WhoDid({ p, onPick, onClose }: { p: NonNullable<Pending>; onPick: (w: W
   )
 }
 
-function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onDone: (p: NonNullable<Pending>) => void }) {
+function Reminders({ s, apply, onDone, embedded }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; onDone: (p: NonNullable<Pending>) => void; embedded?: boolean }) {
   const t = today()
   const [menu, setMenu] = useState<string | null>(null)
   const [pick, setPick] = useState('')
@@ -676,9 +675,9 @@ function Reminders({ s, apply, onDone }: { s: State; apply: (r: { state: State; 
     <><div className="head" style={{ margin: '14px 0 2px', color }}>{label}</div>{list.map(r => row(r, isOver))}</>
   ) : null
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}><div style={{ fontSize: 36, fontWeight: 600 }}>Reminders</div></div>
-      <div className="card scroll" style={{ flex: 1, padding: '6px 28px 24px' }}>
+    <div style={{ height: embedded ? 'auto' : '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}><div style={{ fontSize: embedded ? 30 : 36, fontWeight: 600 }}>Reminders</div></div>
+      <div className={embedded ? '' : 'card scroll'} style={embedded ? { padding: 0 } : { flex: 1, padding: '6px 28px 24px' }}>
         {section(`OVERDUE · ${over.length}`, over, true, 'var(--late)')}
         {section(`COMING UP · ${coming.length}`, coming, false)}
         {over.length === 0 && coming.length === 0 && <div className="muted" style={{ padding: '18px 0', fontSize: 17 }}>Nothing overdue and nothing due in the next 2 weeks.</div>}
@@ -792,13 +791,13 @@ function RuleDialog({ rule, onSave, onDelete, onClose }: { rule: Rule | null; on
   )
 }
 
-function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearOpen }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void; mode: 'light' | 'dark' | 'auto'; setMode: (m: 'light' | 'dark' | 'auto') => void; openErrors: boolean; clearOpen: () => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'habits' | 'faces' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
+function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen, onDone }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void; mode: 'light' | 'dark' | 'auto'; setMode: (m: 'light' | 'dark' | 'auto') => void; openSec: 'errors' | 'reminders' | null; clearOpen: () => void; onDone: (p: NonNullable<Pending>) => void }) {
+  const [sec, setSec] = useState<'look' | 'rules' | 'reminders' | 'habits' | 'faces' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
   const [ruleDlg, setRuleDlg] = useState<Rule | 'new' | null>(null)
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
   const [errList, setErrList] = useState(getErrors())
-  useEffect(() => { if (openErrors) { setSec('errors'); clearOpen() } }, [openErrors, clearOpen])
+  useEffect(() => { if (openSec) { setSec(openSec); clearOpen() } }, [openSec, clearOpen])
   useEffect(() => { if (sec === 'errors') markSeen(); const f = () => setErrList(getErrors()); window.addEventListener('hsh-errors', f); return () => window.removeEventListener('hsh-errors', f) }, [sec])
   const t = today()
   const sorted = useMemo(() => [...s.rules].sort((a, b) => (nextDue(a) ?? 'z') < (nextDue(b) ?? 'z') ? -1 : 1), [s.rules])
@@ -818,7 +817,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['habits', 'Habits'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
+          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
@@ -843,6 +842,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openErrors, clearO
               </div>
             </div>
           )}
+          {sec === 'reminders' && <Reminders s={s} apply={apply} onDone={onDone} embedded />}
           {sec === 'rules' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
