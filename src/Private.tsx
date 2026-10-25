@@ -194,7 +194,6 @@ function Vision({ counts, pins, edit, add, upsert, remove }: { counts: PItem[]; 
             {p.img && <img src={p.img} alt={p.title} style={{ display: 'block', width: '100%', height: 'auto' }} />}
             <div style={{ position: p.img ? 'absolute' : 'static', inset: p.img ? 'auto 0 0 0' : undefined, padding: '26px 14px 12px', color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.5)', background: p.img ? 'linear-gradient(transparent, rgba(0,0,0,.65))' : 'none', ...(p.img ? {} : { height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 150 }) }}>
               <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>{p.title}</div>
-              {p.img && <Credit credit={p.sub} />}
               {edit && <div style={{ marginTop: 8, display: 'flex', gap: 6 }}><button className="btn small outline" onClick={e => { e.stopPropagation(); setPick(p.id) }}>{p.img ? 'Change photo' : 'Add photo'}</button><button className="btn small outline" aria-label={`Delete ${p.title}`} onClick={e => { e.stopPropagation(); if (confirm(`Delete "${p.title}"?`)) remove(p.id) }} style={{ width: 44, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg></button></div>}
             </div>
           </div>
