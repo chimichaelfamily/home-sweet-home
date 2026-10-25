@@ -832,7 +832,7 @@ function FaceIdSettings() {
 }
 
 function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen, onDone }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void; mode: 'light' | 'dark' | 'auto'; setMode: (m: 'light' | 'dark' | 'auto') => void; openSec: 'errors' | 'reminders' | null; clearOpen: () => void; onDone: (p: NonNullable<Pending>) => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'reminders' | 'habits' | 'faces' | 'faceid' | 'calendars' | 'products' | 'goodreads' | 'backup' | 'errors'>('look')
+  const [sec, setSec] = useState<'look' | 'rules' | 'reminders' | 'habits' | 'faces' | 'faceid' | 'calendars' | 'products' | 'goodreads' | 'errors'>('look')
   const [ruleDlg, setRuleDlg] = useState<Rule | 'new' | null>(null)
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
@@ -850,7 +850,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', minHeight: 0 }}>
-          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['faceid', 'Face ID'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['goodreads', 'Goodreads'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
+          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['faceid', 'Face ID'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['goodreads', 'Goodreads'], ['errors', 'Logs']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ flex: 'none', minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
@@ -924,13 +924,6 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
           {sec === 'goodreads' && <GoodreadsSettings />}
           {sec === 'calendars' && <CalendarSettings />}
           {sec === 'products' && <div style={{ height: '100%', minWidth: 0 }}><Products /></div>}
-          {sec === 'backup' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 520 }}>
-              <div style={{ fontSize: 30, fontWeight: 600 }}>Backup</div>
-              <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Everything is copied to GitHub automatically every Saturday at 3am, into the backups branch of your repo.</div>
-              {!usingDatabase && <button className="btn ghost" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset demo data on this device?')) { try { localStorage.removeItem('home-sweet-home.v1') } catch { /* ignore */ } apply({ state: emptyState(), ops: [] }) } }}>Reset demo data</button>}
-            </div>
-          )}
         </div>
       </div>
     </div>
