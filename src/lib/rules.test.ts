@@ -147,3 +147,17 @@ import { solarToLunar } from './lunar.ts'
   assert.strictEqual(l(16, 2, 2026), '29/12') // last day of the month before Tết 2026
   console.log('lunar tests passed')
 }
+
+import { vicHolidays } from './vicHolidays.ts'
+{
+  const h = vicHolidays(2026)
+  assert.strictEqual(h['2026-03-09'], 'Labour Day')
+  assert.strictEqual(h['2026-04-03'], 'Good Friday')
+  assert.strictEqual(h['2026-04-06'], 'Easter Monday')
+  assert.strictEqual(h['2026-06-08'], "King's Birthday")
+  assert.strictEqual(h['2026-09-25'], 'Grand Final Friday')
+  assert.strictEqual(h['2026-11-03'], 'Melbourne Cup')
+  assert.strictEqual(h['2026-12-28'], 'Boxing Day (day off)')
+  assert.strictEqual(Object.keys(h).length, 14 - 0)
+  console.log('vic holiday tests passed')
+}
