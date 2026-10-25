@@ -470,6 +470,8 @@ function CalendarSettings() {
 }
 
 function Morning() {
+  const closeVideoOnLeave = useMedia().closeVideo
+  useEffect(() => () => closeVideoOnLeave(), [closeVideoOnLeave])
   const [items, setItems] = useState<MItem[]>([])
   const [who, setWho] = useState<'linh' | 'michael'>('linh')
   const [i, setI] = useState(0)
@@ -485,11 +487,9 @@ function Morning() {
   }
   const cur = aff[Math.min(i, Math.max(0, aff.length - 1))]
   const media = useMedia()
-  const [watching, setWatching] = useState<MItem | null>(null)
-  const watchSrc = watching ? playerSrc(watching.url) : null
   const row = (it: MItem, kind: 'link' | 'song') => {
     const can = !!(it.url && playerSrc(it.url))
-    const on = kind === 'link' ? watching?.id === it.id : media.music?.id === it.id
+    const on = kind === 'link' ? media.video?.id === it.id : media.music?.id === it.id
     return (
       <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 54, borderBottom: '1px solid var(--border)' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -497,8 +497,8 @@ function Morning() {
           {it.sub && <div className="muted" style={{ fontSize: 13 }}>{it.sub}</div>}
         </div>
         {edit ? <button className="btn small outline" style={{ height: 34, fontSize: 13 }} onClick={() => remove(it.id)}>Remove</button>
-          : can ? (on ? <button className="btn small outline" style={{ height: 36, fontSize: 13 }} onClick={() => kind === 'link' ? setWatching(null) : media.stopMusic()}>Stop</button>
-            : <button className="btn small" style={{ height: 36, fontSize: 13 }} onClick={() => { if (kind === 'link') { media.stopMusic(); setWatching(it) } else { setWatching(null); media.playMusic(it.id, it.title, it.url) } }}>{kind === 'song' ? 'Play' : 'Watch'}</button>)
+          : can ? (on ? <button className="btn small outline" style={{ height: 36, fontSize: 13 }} onClick={() => kind === 'link' ? media.closeVideo() : media.stopMusic()}>Stop</button>
+            : <button className="btn small" style={{ height: 36, fontSize: 13 }} onClick={() => kind === 'link' ? media.watch(it.id, it.title, it.url) : media.playMusic(it.id, it.title, it.url)}>{kind === 'song' ? 'Play' : 'Watch'}</button>)
           : it.url ? <a className="btn small outline" href={it.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', height: 36, fontSize: 13 }}>Open</a>
           : <span className="muted" style={{ fontSize: 13 }}>No link</span>}
       </div>
@@ -515,16 +515,6 @@ function Morning() {
   }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {watching && watchSrc && (
-        <div className="overlay" style={{ zIndex: 46, padding: 16 }} onClick={() => setWatching(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ width: 'min(96vw, 1100px)', borderRadius: 24, overflow: 'hidden', background: 'var(--card)', boxShadow: '0 24px 64px rgba(0,0,0,.45)' }}>
-            <iframe title={watching.title} src={watchSrc.src} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', maxHeight: '78dvh', border: 0, background: '#000' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px' }}>
-              <div style={{ flex: 1, minWidth: 0, fontSize: 18, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{watching.title}</div>
-              <button className="btn small" onClick={() => setWatching(null)}>Close</button>
-            </div>
-          </div>
-        </div>)}
       {picking && (() => { const a = items.find(x => x.id === picking); return a ? <PhotoPicker onPick={(img, credit) => { upsert({ ...a, img, sub: img && credit ? credit : '' }); setPicking(null) }} onClose={() => setPicking(null)} /> : null })()}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Affirmation</div>
