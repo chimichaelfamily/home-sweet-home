@@ -11,6 +11,7 @@ import { clearErrors, getErrors, installGlobalHandlers, logError, markSeen, unse
 import { embedUrl } from './lib/embed.ts'
 import { Weekly } from './Weekly.tsx'
 import { Products } from './Products.tsx'
+import { lockRegister, lockRegistered, lockReset, lockSupported } from './lib/privateData.ts'
 import { Knowledge } from './Knowledge.tsx'
 import { IconView } from './CalIconArt.tsx'
 import { getCalIcons, setCalIcon, TET_ICONS, VEG_ICONS } from './lib/calIcons.ts'
@@ -793,8 +794,22 @@ function RuleDialog({ rule, onSave, onDelete, onClose }: { rule: Rule | null; on
   )
 }
 
+function FaceIdSettings() {
+  const [reg, setReg] = useState(lockRegistered())
+  const [msg, setMsg] = useState('')
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
+      <div style={{ fontSize: 30, fontWeight: 600 }}>Face ID</div>
+      <div style={{ fontSize: 17 }}>{!lockSupported() ? 'This browser does not support Face ID passkeys. Open the app from the Home Screen icon in Safari.' : reg ? 'Face ID is set up on this device. Goals unlock with your face.' : 'Face ID is not set up on this device yet.'}</div>
+      {lockSupported() && !reg && <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={async () => { setMsg(''); try { await lockRegister(); setReg(true); setMsg('Done. Goals now unlock with Face ID.') } catch { setMsg('Setup was cancelled or not allowed. Try again.') } }}>Set up Face ID on this device</button>}
+      {reg && <button className="btn outline" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Reset the Face ID lock on this device? You can set it up again straight away.')) { lockReset(); setReg(false); setMsg('The lock was reset.') } }}>Reset the lock</button>}
+      {msg && <div style={{ fontSize: 15 }}>{msg}</div>}
+    </div>
+  )
+}
+
 function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen, onDone }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; theme: string; setTheme: (t: string) => void; mode: 'light' | 'dark' | 'auto'; setMode: (m: 'light' | 'dark' | 'auto') => void; openSec: 'errors' | 'reminders' | null; clearOpen: () => void; onDone: (p: NonNullable<Pending>) => void }) {
-  const [sec, setSec] = useState<'look' | 'rules' | 'reminders' | 'habits' | 'faces' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
+  const [sec, setSec] = useState<'look' | 'rules' | 'reminders' | 'habits' | 'faces' | 'faceid' | 'calendars' | 'products' | 'backup' | 'errors'>('look')
   const [ruleDlg, setRuleDlg] = useState<Rule | 'new' | null>(null)
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
@@ -819,7 +834,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
+          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['faceid', 'Face ID'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['backup', 'Backup'], ['errors', 'Logs']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
@@ -889,6 +904,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
             </div>
           )}
           {sec === 'faces' && <FaceSettings />}
+          {sec === 'faceid' && <FaceIdSettings />}
           {sec === 'calendars' && <CalendarSettings />}
           {sec === 'products' && <div style={{ height: '100%', minWidth: 0 }}><Products /></div>}
           {sec === 'backup' && (

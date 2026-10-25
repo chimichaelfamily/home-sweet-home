@@ -2,15 +2,17 @@ import { Credit, PhotoPicker } from './PhotoPicker.tsx'
 import { logError } from './lib/errorlog.ts'
 import type { Task } from './lib/types.ts'
 import { Anchors } from './Anchors.tsx'
+import { DEMO_ANCHORS, demoItems } from './lib/demoGoals.ts'
 import { useEffect, useRef, useState } from 'react'
-import { daysUntil, lockRegister, lockRegistered, lockReset, lockSupported, lockUnlock, loadPrivate, money, monthsTo, savePrivate, type Kind, type PItem } from './lib/privateData.ts'
+import { daysUntil, lockRegistered, lockSupported, lockUnlock, loadPrivate, money, monthsTo, savePrivate, type Kind, type PItem } from './lib/privateData.ts'
 
 const IDLE_MS = 2 * 60 * 1000
 type Sub = 'anchors' | 'goals' | 'vision' | 'money'
 
 export function Private({ tasks, onPush }: { tasks: Task[]; onPush: (title: string) => string }) {
   const [unlocked, setUnlocked] = useState(false)
-  const [registered, setRegistered] = useState(lockRegistered())
+  const registered = lockRegistered()
+  const [guest, setGuest] = useState(false)
   const [msg, setMsg] = useState('')
   const timer = useRef<number | undefined>(undefined)
 
@@ -24,53 +26,54 @@ export function Private({ tasks, onPush }: { tasks: Task[]; onPush: (title: stri
     return () => { window.clearTimeout(timer.current); ev.forEach(e => window.removeEventListener(e, arm)) }
   }, [unlocked])
 
-  const go = async (setup: boolean) => {
+  const go = async () => {
     setMsg('')
-    try { if (setup) { await lockRegister(); setRegistered(true) } else await lockUnlock(); setUnlocked(true) }
-    catch { setMsg(setup ? 'Setup was cancelled or not allowed. Try again.' : 'Face ID did not match. Try again.') }
+    try { await lockUnlock(); setUnlocked(true) } catch { setMsg('Face ID did not match. Try again.') }
   }
 
   if (unlocked) return <Inside onLock={() => setUnlocked(false)} tasks={tasks} onPush={onPush} />
+  if (guest) return <Inside demo onLock={() => setGuest(false)} tasks={[]} onPush={() => 'demo'} />
   return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ width: 520, padding: 36, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="card" style={{ width: 520, maxWidth: '100%', padding: 36, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ fontSize: 34, fontWeight: 600 }}>Goals</div>
         <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Goals, vision board and money.</div>
         {!lockSupported() && <div style={{ fontSize: 15 }}>This browser does not support Face ID passkeys. Open the app from the Home Screen icon in Safari.</div>}
-        {lockSupported() && !registered && <button className="btn" onClick={() => go(true)}>Set up Face ID for this device</button>}
-        {lockSupported() && registered && <button className="btn" onClick={() => go(false)}>Unlock with Face ID</button>}
+        {lockSupported() && registered && <button className="btn" onClick={go}>Unlock with Face ID</button>}
+        {lockSupported() && !registered && <div className="muted" style={{ fontSize: 15 }}>Face ID is not set up on this device yet. Settings → Face ID.</div>}
         {msg && <div style={{ fontSize: 15 }}>{msg}</div>}
-        {registered && <button className="btn small outline" onClick={() => { lockReset(); setRegistered(false) }}>Reset the lock</button>}
+        <button className="btn small outline" style={{ alignSelf: 'center' }} onClick={() => setGuest(true)}>Visiting? See the guest version</button>
       </div>
     </div>
   )
 }
 
-function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; onPush: (title: string) => string }) {
+function Inside({ onLock, tasks, onPush, demo = false }: { onLock: () => void; tasks: Task[]; onPush: (title: string) => string; demo?: boolean }) {
   const [sub, setSub] = useState<Sub>('anchors')
-  const [items, setItems] = useState<PItem[]>([])
+  const [items, setItems] = useState<PItem[]>(() => (demo ? demoItems() : []))
   const [err, setErr] = useState('')
   const [edit, setEdit] = useState(false)
-  useEffect(() => { loadPrivate().then(setItems).catch(() => { logError('Goals: loading', 'Could not load. Has 005_private.sql been run?'); setErr('Could not load. Has 005_private.sql been run?') }) }, [])
+  useEffect(() => { if (demo) return; loadPrivate().then(setItems).catch(() => { logError('Goals: loading', 'Could not load. Has 005_private.sql been run?'); setErr('Could not load. Has 005_private.sql been run?') }) }, [])
   const of = (k: Kind) => items.filter(x => x.kind === k).sort((a, b) => a.sort - b.sort)
-  const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); savePrivate(next, { upsert: it }).catch(() => { logError('Goals: saving', 'Could not save. Have 005_private.sql and 011_goal_steps.sql been run?'); setErr('Could not save. Have 005_private.sql and 011_goal_steps.sql been run?') }) }
-  const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); savePrivate(next, { remove: id }).catch(() => setErr('Could not remove.')) }
+  const upsert = (it: PItem) => { const next = items.some(x => x.id === it.id) ? items.map(x => x.id === it.id ? it : x) : [...items, it]; setItems(next); if (demo) return; savePrivate(next, { upsert: it }).catch(() => { logError('Goals: saving', 'Could not save. Have 005_private.sql and 011_goal_steps.sql been run?'); setErr('Could not save. Have 005_private.sql and 011_goal_steps.sql been run?') }) }
+  const remove = (id: string) => { const next = items.filter(x => x.id !== id); setItems(next); if (demo) return; savePrivate(next, { remove: id }).catch(() => setErr('Could not remove.')) }
   const add = (kind: Kind, f: Partial<PItem>) => { const l = of(kind); upsert({ id: `${kind}-${Date.now().toString(36)}`, kind, title: '', sub: '', cat: '', num1: 0, num2: 0, day: null, sort: (l[l.length - 1]?.sort ?? 0) + 1, ...f }) }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="mc-head" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Goals</div>
+        {demo && <span className="pill" style={{ background: 'var(--ground)', border: '1px solid var(--border)' }}>Guest view</span>}
         <div className="sub-tabs" style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
           {([['anchors', 'Anchors'], ['goals', 'Goals'], ['vision', 'Vision board'], ['money', 'Money magic']] as [Sub, string][]).map(([k, l]) => <button key={k} onClick={() => setSub(k)} style={{ height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: sub === k ? 'var(--accent)' : 'transparent', color: sub === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
         </div>
         <div style={{ flex: 1 }} />
         {sub !== 'anchors' && <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>}
-        <button className="btn small" onClick={onLock}>Lock</button>
+        <button className="btn small" onClick={onLock}>{demo ? 'Leave guest view' : 'Lock'}</button>
       </div>
       {err && <div style={{ fontSize: 14 }}>{err}</div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
-        {sub === 'anchors' && <Anchors />}
-        {sub === 'goals' && <Goals pillars={of('pillar')} steps={of('step')} tasks={tasks} onPush={onPush} edit={edit} add={add} upsert={upsert} remove={remove} />}
+        {sub === 'anchors' && <Anchors list={demo ? DEMO_ANCHORS : undefined} />}
+        {sub === 'goals' && <Goals pillars={of('pillar')} steps={of('step')} tasks={tasks} onPush={onPush} demo={demo} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'vision' && <Vision counts={of('countdown')} pins={of('pin')} edit={edit} add={add} upsert={upsert} remove={remove} />}
         {sub === 'money' && <Money rows={of('money')} edit={edit} add={add} upsert={upsert} remove={remove} />}
       </div>
@@ -81,12 +84,12 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
 interface Ops { edit: boolean; add: (k: Kind, f: Partial<PItem>) => void; upsert: (i: PItem) => void; remove: (id: string) => void }
 const RM = ({ onClick }: { onClick: () => void }) => <button className="btn small outline" onClick={onClick}>Remove</button>
 
-function Goals({ pillars, steps, tasks, onPush, edit, add, upsert, remove }: { pillars: PItem[]; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string } & Ops) {
+function Goals({ pillars, steps, tasks, onPush, demo, edit, add, upsert, remove }: { pillars: PItem[]; steps: PItem[]; tasks: Task[]; onPush: (title: string) => string; demo: boolean } & Ops) {
   const [pt, setPt] = useState('')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const taskOf = (st: PItem) => (st.sub.startsWith('task:') ? tasks.find(t => t.id === st.sub.slice(5)) : undefined)
   const isDone = (st: PItem) => st.num1 === 1 || !!taskOf(st)?.done_at
-  const inTodo = (st: PItem) => { const t = taskOf(st); return !!t && !t.done_at }
+  const inTodo = (st: PItem) => { if (demo) return st.sub.startsWith('task:'); const t = taskOf(st); return !!t && !t.done_at }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {pillars.length === 0 && <div className="card muted" style={{ padding: 22 }}>Tap Edit to add a big goal, like "Vietnam trip". Then break it into steps and choose which ones go on your To do list.</div>}

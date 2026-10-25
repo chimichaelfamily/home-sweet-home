@@ -12,10 +12,10 @@ const PATHS: Record<AnchorIcon, React.ReactElement> = {
   child: <><circle cx="12" cy="12.500" r="8" /><path d="M9 15c1.200 1.600 4.800 1.600 6 0" /><circle cx="9.500" cy="11" r=".7" fill="var(--accent)" stroke="none" /><circle cx="14.500" cy="11" r=".7" fill="var(--accent)" stroke="none" /><path d="M11 4.500c-.8-1.800 1.600-2.800 2.600-1.200" /></>,
 }
 
-export function Anchors() {
+export function Anchors({ list = ANCHORS }: { list?: { text: string; icon: AnchorIcon }[] }) {
   return (
     <div className="anchor-cards">
-      {ANCHORS.map(a => (
+      {list.map(a => (
         <div key={a.text} className="anchor-card">
           <span className="anchor-icon">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.700" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{PATHS[a.icon]}</svg>
