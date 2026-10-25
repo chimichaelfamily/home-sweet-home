@@ -88,18 +88,13 @@ function Goals({ pillars, steps, tasks, onPush, edit, add, upsert, remove }: { p
   const inTodo = (st: PItem) => { const t = taskOf(st); return !!t && !t.done_at }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 28, padding: '26px 28px 24px', color: '#fff', background: 'linear-gradient(135deg, var(--accent), var(--g2))', boxShadow: '0 10px 30px rgba(0,0,0,.14)' }}>
-        <svg width="190" height="190" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ position: 'absolute', right: -24, top: -22, opacity: .14 }}><circle cx="12" cy="5" r="2.200" /><path d="M12 7.200V21M7 11h10M4 15c0 3.500 3.500 6 8 6s8-2.500 8-6M4 15l2 1.500M20 15l-2 1.500" /></svg>
-        <div style={{ position: 'relative', fontSize: 13, fontWeight: 700, letterSpacing: 3, opacity: .85 }}>OUR ANCHORS · FOR LIFE</div>
-        <div style={{ position: 'relative', fontFamily: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif", fontStyle: 'italic', fontSize: 17, opacity: .92, margin: '4px 0 14px' }}>What we are building towards. Read these when you need to keep going.</div>
-        <div className="anchor-grid" style={{ position: 'relative' }}>
-          {ANCHORS.map((t, i) => (
-            <div key={t} style={{ display: 'flex', gap: 12, alignItems: 'baseline', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.22)' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, opacity: .7, width: 20, flex: 'none' }}>{String(i + 1).padStart(2, '0')}</span>
-              <span style={{ fontFamily: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif", fontSize: 21, lineHeight: 1.25 }}>{t}</span>
-            </div>
-          ))}
-        </div>
+      <div style={{ borderRadius: 28, padding: '26px 24px', textAlign: 'center', background: 'color-mix(in srgb, var(--accent) 9%, var(--card))', border: '1px solid color-mix(in srgb, var(--accent) 28%, var(--border))' }}>
+        {ANCHORS.map((t, i) => (
+          <div key={t}>
+            {i > 0 && <svg width="9" height="9" viewBox="0 0 12 12" aria-hidden="true" style={{ display: 'block', margin: '9px auto', opacity: .45 }}><path d="M6 0l6 6-6 6-6-6z" fill="var(--accent)" /></svg>}
+            <div style={{ fontFamily: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif", fontStyle: 'italic', fontSize: 22, lineHeight: 1.3, color: 'var(--ink)' }}>{t}</div>
+          </div>
+        ))}
       </div>
       {pillars.length === 0 && <div className="card muted" style={{ padding: 22 }}>Tap Edit to add a big goal, like "Vietnam trip". Then break it into steps and choose which ones go on your To do list.</div>}
       {pillars.map(p => {
