@@ -248,7 +248,7 @@ import { adzunaRow, jobKey, postedFrom, serpRow } from '../../api/jobs.js'
   console.log('job tests passed')
 }
 
-import { linkKey, parseShared, siteOf, splitTitle } from '../../api/_jobshare.js'
+import { decodePage, linkKey, parsePage, parseShared, siteOf, splitTitle } from '../../api/_jobshare.js'
 {
   const a = parseShared('Check out this job on SEEK: Videographer at Bright Studio https://www.seek.com.au/job/81234567?type=standard')
   assert.strictEqual(a.url, 'https://www.seek.com.au/job/81234567?type=standard'); assert.strictEqual(a.title, 'Videographer'); assert.strictEqual(a.company, 'Bright Studio')
@@ -259,4 +259,15 @@ import { linkKey, parseShared, siteOf, splitTitle } from '../../api/_jobshare.js
   assert.notStrictEqual(linkKey('https://au.indeed.com/viewjob?jk=abc'), linkKey('https://au.indeed.com/viewjob?jk=def'))
   assert.strictEqual(siteOf('https://au.indeed.com/viewjob?jk=abc'), 'Indeed')
   console.log('job share tests passed')
+}
+
+{
+  const ld = '<html><head><script type="application/ld+json">{"@type":"JobPosting","title":"Videographer","hiringOrganization":{"name":"Bright Studio"},"jobLocation":{"address":{"addressLocality":"Richmond","addressRegion":"VIC"}},"baseSalary":{"value":{"minValue":70000,"maxValue":85000}}}</script></head></html>'
+  assert.deepStrictEqual(parsePage(ld), { title: 'Videographer', company: 'Bright Studio', place: 'Richmond, VIC', pay: '$70,000 – $85,000' })
+  const seek = '<title>Videographer Job in Richmond, Melbourne VIC - SEEK</title><span data-automation="advertiser-name">Bright Studio</span>'
+  assert.deepStrictEqual(parsePage(seek), { title: 'Videographer', company: 'Bright Studio', place: 'Richmond, Melbourne VIC', pay: '' })
+  const big = ld + ' '.repeat(50)
+  assert.strictEqual(decodePage(Buffer.from(big).toString('base64')), big)
+  assert.strictEqual(decodePage('plain text here'), 'plain text here')
+  console.log('job page tests passed')
 }

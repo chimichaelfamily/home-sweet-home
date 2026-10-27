@@ -58,6 +58,69 @@ export async function pageTitle(url) {
   } catch { return '' }
 }
 
+/** Pull the job title, company, place and pay out of an ad page's HTML (sent by the iPad, which can open the ad).
+ *  Uses the page's job data (JSON-LD JobPosting) when present, then common patterns, then the page title. */
+export function parsePage(html) {
+  const out = { title: '', company: '', place: '', pay: '' }
+  if (!html) return out
+  const h = String(html)
+  for (const m of h.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const j = JSON.parse(m[1].trim())
+      const list = [].concat(j['@graph'] || j)
+      const jp = list.find(x => x && /JobPosting/i.test(String(x['@type'])))
+      if (jp) {
+        out.title = clean(jp.title)
+        out.company = clean(jp.hiringOrganization?.name || '')
+        const loc = [].concat(jp.jobLocation || [])[0]?.address
+        out.place = clean(loc ? [loc.addressLocality, loc.addressRegion].filter(Boolean).join(', ') : '')
+        const bs = jp.baseSalary?.value
+        if (bs && (bs.minValue || bs.maxValue)) out.pay = [bs.minValue, bs.maxValue].filter(Boolean).map(n => '$' + Math.round(n).toLocaleString('en-AU')).join(' – ')
+        break
+      }
+    } catch { /* not JSON */ }
+  }
+  const unq = v => clean(String(v).replace(/\\u0026/g, '&').replace(/\\"/g, '"'))
+  if (!out.company) {
+    const m = h.match(/"advertiser"\s*:\s*\{[^{}]*?"(?:name|description)"\s*:\s*"([^"]{2,120})"/) || h.match(/"(?:advertiserName|companyName|hiringOrganizationName)"\s*:\s*"([^"]{2,120})"/) || h.match(/data-automation=["']advertiser-name["'][^>]*>([^<]{2,120})</)
+    if (m) out.company = unq(m[1])
+  }
+  if (!out.place) { const m = h.match(/data-automation=["']job-detail-location["'][^>]*>([^<]{2,120})</); if (m) out.place = unq(m[1]) }
+  if (!out.title) {
+    const m = h.match(/data-automation=["']job-detail-title["'][^>]*>([^<]{2,160})</)
+    const og = h.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) || h.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)
+    const tt = h.match(/<title[^>]*>([^<]+)<\/title>/i)
+    const t = splitTitle(m ? m[1] : og ? og[1] : tt ? tt[1] : '')
+    out.title = t.title; out.company = out.company || t.company; out.place = out.place || t.place
+  }
+  return out
+}
+
+/** The iPad sends the page base64-encoded (so nothing is lost on the way); plain HTML or text also works. */
+export function decodePage(v) {
+  const s = String(v || '').trim()
+  if (!s) return ''
+  if (/^[A-Za-z0-9+/=\s]+$/.test(s) && s.length > 100) { try { return Buffer.from(s.replace(/\s+/g, ''), 'base64').toString('utf8') } catch { /* not base64 */ } }
+  return s
+}
+
+/** Backup: ask Google (through SerpApi) what it knows about this exact ad link. One search. */
+export async function googleDetails(url, serpKey) {
+  if (!url || !serpKey) return { title: '', company: '', place: '' }
+  const q = new URLSearchParams({ engine: 'google', q: url.split('?')[0], hl: 'en', gl: 'au', google_domain: 'google.com.au', num: '5', api_key: serpKey })
+  try {
+    const r = await fetch(`https://serpapi.com/search.json?${q}`)
+    if (!r.ok) return { title: '', company: '', place: '' }
+    const j = await r.json()
+    const id = (url.match(/\/job\/(\d+)/) || [])[1]
+    const hit = (j.organic_results || []).find(o => (id ? String(o.link).includes(id) : true)) || (j.organic_results || [])[0]
+    if (!hit) return { title: '', company: '', place: '' }
+    const t = splitTitle(hit.title || '')
+    if (!t.company) { const m = String(hit.snippet || '').match(/^([A-Z][\w&'.\- ]{1,60}?) (?:is (?:seeking|looking|hiring)|are (?:seeking|looking|hiring))/); if (m) t.company = clean(m[1]) }
+    return t
+  } catch { return { title: '', company: '', place: '' } }
+}
+
 /** The company's address from Google Maps (through SerpApi). One search; returns '' when nothing clear is found. */
 export async function findAddress(company, near, serpKey) {
   if (!company || !serpKey) return ''

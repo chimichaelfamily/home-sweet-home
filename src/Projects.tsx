@@ -242,7 +242,8 @@ function JobBoard({ edit }: { edit: boolean }) {
     return () => { document.removeEventListener('visibilitychange', back); window.removeEventListener('focus', back); window.clearInterval(t) }
   }, [])
   const patch = (id: string, f: Partial<Job>) => setJobs(js => js.map(x => (x.id === id ? { ...x, ...f } : x)).filter(x => x.status !== 'hidden'))
-  const lookUp = (id: string) => findJobAddress(id).then(address => { if (address) patch(id, { address }) }).catch(e => logError('Jobs: finding the address', e))
+  const [finding, setFinding] = useState('')
+  const lookUp = (id: string) => { setFinding(id); return findJobAddress(id).then(f => { if (Object.keys(f).length) patch(id, f); else setMsg('Google had no more details for that ad. Tap Edit to type the company.') }).catch(e => { logError('Jobs: finding details', e); setMsg(String((e as Error).message || e)) }).finally(() => setFinding('')) }
   const mark = (j: Job, status: JobStatus) => {
     patch(j.id, { status })
     setJobStatus(j.id, status).then(() => { if (status === 'saved' && j.company && !j.address) lookUp(j.id) }).catch(e => { logError('Jobs: saving', e); setMsg('Could not save.') })
@@ -330,7 +331,10 @@ function JobBoard({ edit }: { edit: boolean }) {
               </a>
             ) : view !== 'new' && (j.company
               ? <button onClick={() => lookUp(j.id)} style={{ marginTop: 6, border: 'none', background: 'none', padding: 0, fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Find {j.company}'s address</button>
-              : <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>Tap Edit and add the company to find its address.</div>)}
+              : <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <button className="btn small outline" style={{ height: 34, fontSize: 13 }} disabled={finding === j.id} onClick={() => lookUp(j.id)}>{finding === j.id ? 'Looking…' : 'Find details'}</button>
+                  <span className="muted" style={{ fontSize: 13 }}>or tap Edit to type the company</span>
+                </div>)}
             <div><a href={j.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 4, fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>Open the ad ↗</a></div>
           </div>
           )}
@@ -375,10 +379,12 @@ function ShareSetup() {
       <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {step(1, <>Tap <b>Copy link</b> above.</>)}
         {step(2, <>Open the <b>Shortcuts</b> app → <b>+</b> → name it <b>Save to job board</b>.</>)}
-        {step(3, <>Add the action <b>Get Contents of URL</b>. Paste the link as the URL. Tap the arrow: Method <b>POST</b>, Request Body <b>JSON</b>, add a <b>Text</b> field named <b>shared</b> and set its value to <b>Shortcut Input</b>.</>)}
-        {step(4, <>Add the action <b>Show Notification</b> and set it to <b>Contents of URL</b>, so you see "Saved to the job board".</>)}
-        {step(5, <>Tap <b>ⓘ</b> (Details) → turn on <b>Show in Share Sheet</b>, and allow <b>URLs</b>, <b>Text</b> and <b>Safari web pages</b>.</>)}
-        {step(6, <>Test it: open any Seek ad → Share → <b>Save to job board</b>. The first time, tap <b>Allow</b>.</>)}
+        {step(3, <>Add <b>Get Contents of URL</b> and set its URL to <b>Shortcut Input</b>. (The iPad opens the ad so the board can read the title, company and pay.)</>)}
+        {step(4, <>Add <b>Base64 Encode</b>. It uses <b>Contents of URL</b> from step 3. Tap the arrow and set Line Breaks to <b>None</b>.</>)}
+        {step(5, <>Add a second <b>Get Contents of URL</b>. Paste the copied link as its URL. Tap the arrow: Method <b>POST</b>, Request Body <b>JSON</b>. Add a <b>Text</b> field named <b>shared</b> = <b>Shortcut Input</b>, and a <b>Text</b> field named <b>page</b> = <b>Base64 Encoded</b>.</>)}
+        {step(6, <>Add <b>Show Notification</b> and set it to <b>Contents of URL</b> (from step 5), so you see "Saved to the job board".</>)}
+        {step(7, <>Tap <b>ⓘ</b> (Details) → turn on <b>Show in Share Sheet</b>, and allow <b>URLs</b>, <b>Text</b> and <b>Safari web pages</b>.</>)}
+        {step(8, <>Test it: open any Seek ad → Share → <b>Save to job board</b>. The first time, tap <b>Allow</b> each time it asks.</>)}
       </ol>
       <div><button className="btn small outline" style={{ height: 36, fontSize: 13 }} onClick={() => { if (confirm('Make a new link? The old Share button stops working until you paste the new link into the Shortcut.')) shareKey(true).then(setKey).catch(() => setErr('Could not make a new link.')) }}>Make a new link</button></div>
     </div>
