@@ -4,13 +4,11 @@ import { addDays, fromYmd, toYmd } from './dates.ts'
 export type CalKey = 'linh' | 'michael' | 'chi' // linh = the shared (Both) calendar
 export interface CalEvent { title: string; day: string; time: string; allDay: boolean; sort: number; person: CalKey }
 
-/** Days to show: Mon..Sun this week; Saturday shows Sat+Sun; Sunday shows today + all of next week. */
+/** Days to show: from today until Sunday (Tue shows Tue..Sun, Sat shows Sat+Sun); on Sunday, Sunday through next Sunday. */
 export function scheduleDays(todayYmd: string): string[] {
   const dow = fromYmd(todayYmd).getDay() // 0 Sun
-  if (dow === 6) return [todayYmd, addDays(todayYmd, 1)]
-  if (dow === 0) return [todayYmd, ...Array.from({ length: 7 }, (_, i) => addDays(todayYmd, i + 1))]
-  const mon = addDays(todayYmd, 1 - dow)
-  return Array.from({ length: 7 }, (_, i) => addDays(mon, i))
+  const count = dow === 0 ? 8 : 8 - dow // days from today through the coming Sunday
+  return Array.from({ length: count }, (_, i) => addDays(todayYmd, i))
 }
 
 const hm = (d: Date) => d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).replace(' ', '').toLowerCase()
