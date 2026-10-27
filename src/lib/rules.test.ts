@@ -230,10 +230,20 @@ import { routineStreak } from './routines.ts'
   console.log('routine tests passed')
 }
 
-import { toRow } from '../../api/jobs.js'
+import { adzunaRow, jobKey, postedFrom, serpRow } from '../../api/jobs.js'
 {
-  const r = toRow({ id: 123, title: '<strong>Videographer</strong> &amp; Editor', company: { display_name: 'Acme' }, location: { display_name: 'Richmond, Melbourne' }, salary_min: 70000, salary_max: 85000, salary_is_predicted: '0', redirect_url: 'https://x', created: '2026-10-27T01:00:00Z', contract_time: 'full_time' }, 'videographer')
-  assert.strictEqual(r.id, 'adzuna-123'); assert.strictEqual(r.title, 'Videographer & Editor'); assert.strictEqual(r.pay, '$70k – $85k'); assert.strictEqual(r.kind, 'Full time'); assert.strictEqual(r.posted, '2026-10-27')
-  assert.strictEqual(toRow({ id: 1, title: 'x', salary_min: 50000, salary_is_predicted: '1', redirect_url: 'u' }, 'x').pay, '')
+  const r = adzunaRow({ id: 123, title: '<strong>Videographer</strong> &amp; Editor', company: { display_name: 'Acme' }, location: { display_name: 'Richmond, Melbourne' }, salary_min: 70000, salary_max: 85000, salary_is_predicted: '0', redirect_url: 'https://x', created: '2026-10-27T01:00:00Z', contract_time: 'full_time' }, 'videographer')
+  assert.strictEqual(r.title, 'Videographer & Editor'); assert.strictEqual(r.pay, '$70k – $85k'); assert.strictEqual(r.kind, 'Full time · via Adzuna'); assert.strictEqual(r.posted, '2026-10-27')
+  assert.strictEqual(adzunaRow({ id: 1, title: 'x', salary_min: 50000, salary_is_predicted: '1', redirect_url: 'u' }, 'x').pay, '')
+  const now = new Date('2026-10-27T09:00:00Z')
+  assert.strictEqual(postedFrom('3 days ago', now), '2026-10-24')
+  assert.strictEqual(postedFrom('an hour ago', now), '2026-10-27')
+  assert.strictEqual(postedFrom('2 weeks ago', now), '2026-10-13')
+  assert.strictEqual(postedFrom('', now), null)
+  const g = serpRow({ title: 'Videographer & Editor', company_name: 'ACME', location: 'Melbourne VIC', via: 'via SEEK', share_link: 'https://g', apply_options: [{ title: 'SEEK', link: 'https://seek/1' }], detected_extensions: { posted_at: '3 days ago', schedule_type: 'Full-time', salary: '$70K–$85K a year' } }, 'videographer', now)!
+  assert.strictEqual(g.url, 'https://seek/1'); assert.strictEqual(g.kind, 'Full-time · via SEEK'); assert.strictEqual(g.posted, '2026-10-24'); assert.strictEqual(g.pay, '$70K–$85K a year')
+  assert.strictEqual(g.id, r.id) // same ad from Google and Adzuna shows once
+  assert.strictEqual(serpRow({ title: '', share_link: 'x' }, 'x'), null)
+  assert.notStrictEqual(jobKey('Photographer', 'A'), jobKey('Photographer', 'B'))
   console.log('job tests passed')
 }

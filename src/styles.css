@@ -205,3 +205,14 @@ textarea { height: auto !important; min-height: 120px; padding: 12px 14px; line-
 .chip { height: 36px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 1px solid var(--border); background: var(--card); color: var(--ink); text-transform: capitalize; }
 .chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .card.job a:active { opacity: .7; }
+/* Habits pill in the clock card (Settings → Habits → Pop-up) */
+.habit-pill { flex: none; height: 64px; padding: 0 16px 0 10px; border-radius: 20px; border: 1.5px solid rgba(255,255,255,.8); background: rgba(30,24,44,.24); color: #fff; display: flex; align-items: center; gap: 10px; text-shadow: none; font-family: inherit; }
+.habit-pill:active { transform: scale(.97); }
+.hp-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #fff; box-sizing: border-box; display: block; }
+.hp-dot.on { background: #fff; }
+.hp-bar { width: 96px; height: 6px; border-radius: 6px; background: rgba(255,255,255,.35); display: block; overflow: hidden; }
+.hp-bar i { display: block; height: 100%; background: #fff; border-radius: 6px; }
+.habit-sheet { width: min(94vw, 620px); }
+@media (max-width: 640px) { .habit-pill { height: 54px; padding: 0 12px 0 8px; } }
+.wx-content:has(.habit-pill) { gap: 12px; }
+@media (max-width: 640px) { .wx-content:has(.habit-pill) { flex-wrap: wrap; } .wx-content:has(.habit-pill) .habit-pill { order: 3; width: 100%; justify-content: flex-start; } }

@@ -277,6 +277,8 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
   const totals = monthTotals(s)
   const wx = useWeather()
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
+  const [habitStyle] = useHabitStyle()
+  const [sheet, setSheet] = useState(false)
   const untick = (kind: 'task' | 'rule', id: string) => {
     const ev = s.events.filter(e => !e.undone_at && (kind === 'task' ? e.task_id === id : e.rule_id === id && isoToYmd(e.created_at) === t)).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0]
     if (ev) apply(A.undo(s, ev.batch))
@@ -345,18 +347,74 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
             <div style={{ fontSize: 56, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{now.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: false })}</div>
             <div style={{ fontSize: 18, opacity: .9 }}>{now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
           </div>
-          {wx ? (
+          {habitStyle === 'popup' && <HabitPill s={s} who={hwho} onOpen={() => setSheet(true)} />}
+          {wx ? (habitStyle === 'popup' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
+              <div style={{ fontSize: 44, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{wx.temp}°</div>
+              <div><div style={{ fontSize: 16, fontWeight: 600 }}>{wx.text}</div><div style={{ fontSize: 14, opacity: .9 }}>H {wx.hi}° · L {wx.lo}°</div></div>
+            </div>
+          ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ fontSize: 54, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{wx.temp}°</div>
               <div><div style={{ fontSize: 19, fontWeight: 600 }}>{wx.text}</div><div style={{ fontSize: 15, opacity: .9 }}>H {wx.hi}° · L {wx.lo}°</div><div style={{ fontSize: 15, opacity: .9 }}>Melbourne</div></div>
             </div>
-          ) : <div style={{ fontSize: 16, opacity: .9 }}>Melbourne weather loading…</div>}
+          )) : <div style={{ fontSize: 16, opacity: .9 }}>{habitStyle === 'popup' ? 'Weather…' : 'Melbourne weather loading…'}</div>}
         </WeatherScene>
         <Schedule />
-        <div className="card" style={{ flex: 'none', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {habitStyle === 'card' && <div className="card" style={{ flex: 'none', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 24, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
           <HabitChips s={s} apply={apply} who={hwho} />
+        </div>}
+      </div>
+      {sheet && habitStyle === 'popup' && <HabitSheet s={s} apply={apply} who={hwho} setWho={setHwho} onClose={() => setSheet(false)} />}
+    </div>
+  )
+}
+
+/** How habits show on Home: 'popup' = a pill in the clock card that opens a pop-up; 'card' = the original Habits card. Settings → Habits switches it. */
+type HabitStyle = 'popup' | 'card'
+const HS_KEY = 'hsh.habitStyle'
+function useHabitStyle(): [HabitStyle, (v: HabitStyle) => void] {
+  const read = (): HabitStyle => { try { return localStorage.getItem(HS_KEY) === 'card' ? 'card' : 'popup' } catch { return 'popup' } }
+  const [v, setV] = useState<HabitStyle>(read)
+  useEffect(() => { const f = () => setV(read()); window.addEventListener('hsh-habitstyle', f); return () => window.removeEventListener('hsh-habitstyle', f) }, [])
+  const set = (n: HabitStyle) => { try { localStorage.setItem(HS_KEY, n) } catch { /* ignore */ } setV(n); window.dispatchEvent(new Event('hsh-habitstyle')) }
+  return [v, set]
+}
+
+function HabitPill({ s, who, onOpen }: { s: State; who: 'linh' | 'michael'; onOpen: () => void }) {
+  const t = today()
+  const hs = s.habits.filter(h => h.person_id === who && h.active).sort((a, b) => a.sort - b.sort)
+  const done = hs.map(h => s.habitLogs.some(l => l.habit_id === h.id && l.day === t))
+  const n = done.filter(Boolean).length
+  return (
+    <button className="habit-pill" onClick={onOpen} aria-label={`${PEOPLE[who]}'s habits: ${n} of ${hs.length} done today. Open habits`}>
+      <Face who={who} size={40} />
+      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
+        <span style={{ fontSize: 16, fontWeight: 700 }}>{n === hs.length && hs.length > 0 ? 'Habits all done' : `Habits ${n}/${hs.length}`}</span>
+        {hs.length <= 12
+          ? <span aria-hidden="true" style={{ display: 'flex', gap: 3 }}>{done.map((d, i) => <i key={i} className={'hp-dot' + (d ? ' on' : '')} />)}</span>
+          : <span aria-hidden="true" className="hp-bar"><i style={{ width: `${hs.length ? (n / hs.length) * 100 : 0}%` }} /></span>}
+      </span>
+    </button>
+  )
+}
+
+function HabitSheet({ s, apply, who, setWho, onClose }: { s: State; apply: (r: { state: State; ops: Op[] }) => Promise<unknown>; who: 'linh' | 'michael'; setWho: (w: 'linh' | 'michael') => void; onClose: () => void }) {
+  // closes by itself 20 seconds after the last tap
+  const timer = useRef<number | undefined>(undefined)
+  const arm = useCallback(() => { window.clearTimeout(timer.current); timer.current = window.setTimeout(onClose, 20000) }, [onClose])
+  useEffect(() => { arm(); return () => window.clearTimeout(timer.current) }, [arm])
+  return (
+    <div className="overlay" onClick={onClose} onPointerDown={arm}>
+      <div className="dialog habit-sheet" role="dialog" aria-label="Habits today" onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 26, fontWeight: 600, flex: 1 }}>Habits today</div>
+          <PersonToggle who={who} setWho={setWho} />
+          <button className="btn small outline" aria-label="Close" onClick={onClose} style={{ width: 44, padding: 0 }}>✕</button>
         </div>
+        <HabitChips s={s} apply={apply} who={who} />
+        <div className="muted" style={{ fontSize: 13 }}>Closes by itself after 20 seconds.</div>
       </div>
     </div>
   )
@@ -843,6 +901,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
   const [ruleDlg, setRuleDlg] = useState<Rule | 'new' | null>(null)
   const [hwho, setHwho] = useState<'linh' | 'michael'>('linh')
   const [newHabit, setNewHabit] = useState('')
+  const [habitStyle, setHabitStyle] = useHabitStyle()
   const [errList, setErrList] = useState(getErrors())
   useEffect(() => { if (openSec) { setSec(openSec); clearOpen() } }, [openSec, clearOpen])
   useEffect(() => { if (sec === 'errors') markSeen(); const f = () => setErrList(getErrors()); window.addEventListener('hsh-errors', f); return () => window.removeEventListener('hsh-errors', f) }, [sec])
@@ -901,6 +960,10 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
           {sec === 'habits' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 560 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 30, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span className="muted" style={{ fontSize: 15 }}>On the Home screen:</span>
+                {([['popup', 'Pop-up in the clock card'], ['card', 'Card under the schedule']] as const).map(([k, l]) => <button key={k} aria-pressed={habitStyle === k} onClick={() => setHabitStyle(k)} style={{ height: 44, padding: '0 18px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: '1.5px solid var(--mborder)', background: habitStyle === k ? 'var(--accent)' : 'transparent', color: habitStyle === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+              </div>
               {s.habits.filter(h => h.person_id === hwho && h.active).sort((a, b) => a.sort - b.sort).map(h => (
                 <div key={h.id} style={{ display: 'flex', gap: 10 }}>
                   <input type="text" aria-label="Habit name" defaultValue={h.name} onBlur={e => { const v = e.target.value.trim(); if (v && v !== h.name) apply(A.updateHabit(s, h.id, { name: v })) }} />

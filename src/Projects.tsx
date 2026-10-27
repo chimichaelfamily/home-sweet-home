@@ -249,7 +249,7 @@ function JobBoard({ edit }: { edit: boolean }) {
   const shown = jobs.filter(j => j.status === view && (!only || j.search === only))
   const count = (v: JobView) => jobs.filter(j => j.status === v).length
   const age = (d: string | null) => { if (!d) return ''; const n = Math.round((new Date(t).getTime() - new Date(d).getTime()) / 86400000); return n <= 0 ? 'Today' : n === 1 ? 'Yesterday' : n < 7 ? `${n} days ago` : fmtShort(d) }
-  const ranText = ran ? `Last checked ${new Date(ran.ran_at).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).toLowerCase()} · checks daily at 7pm` : 'Checks for new ads every day at 7pm'
+  const ranText = ran ? `Last checked ${new Date(ran.ran_at).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).toLowerCase()} · checks daily at 7pm` : 'Checks Google job search (Seek, LinkedIn, Indeed and more) every day at 7pm'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="card" style={{ padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

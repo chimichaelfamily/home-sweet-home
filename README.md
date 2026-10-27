@@ -12,6 +12,8 @@ Until Supabase is connected the app runs in demo mode and saves on the device on
 
 ## Personal projects tab (Face ID)
 - Run `supabase/migrations/015_projects.sql` in the Supabase SQL editor.
-- Michael's job board collects ads from Adzuna every evening at 7pm Melbourne time (Vercel Cron, see `vercel.json` and `api/jobs.js`).
+- Michael's job board collects ads every evening at 7pm Melbourne time (Vercel Cron, see `vercel.json` and `api/jobs.js`)
+  from Google's job search (ads from Seek, LinkedIn, Indeed and company sites) through SerpApi's free plan.
   Add these in Vercel → Settings → Environment Variables, then redeploy:
-  `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` (free at developer.adzuna.com) and `SUPABASE_SERVICE_KEY` (Supabase → Project Settings → API → service_role).
+  `SERPAPI_KEY` (free at serpapi.com → Your account → API key) and `SUPABASE_SERVICE_KEY` (Supabase → Project Settings → API → service_role).
+  Optional: `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` add Adzuna ads while its free test calls last.
