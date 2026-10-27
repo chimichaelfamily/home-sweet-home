@@ -247,3 +247,16 @@ import { adzunaRow, jobKey, postedFrom, serpRow } from '../../api/jobs.js'
   assert.notStrictEqual(jobKey('Photographer', 'A'), jobKey('Photographer', 'B'))
   console.log('job tests passed')
 }
+
+import { linkKey, parseShared, siteOf, splitTitle } from '../../api/_jobshare.js'
+{
+  const a = parseShared('Check out this job on SEEK: Videographer at Bright Studio https://www.seek.com.au/job/81234567?type=standard')
+  assert.strictEqual(a.url, 'https://www.seek.com.au/job/81234567?type=standard'); assert.strictEqual(a.title, 'Videographer'); assert.strictEqual(a.company, 'Bright Studio')
+  assert.deepStrictEqual(parseShared('https://www.seek.com.au/job/1'), { url: 'https://www.seek.com.au/job/1', title: '', company: '', place: '' })
+  assert.deepStrictEqual(splitTitle('Lune Cafe hiring Social Media Coordinator in Melbourne, Victoria | LinkedIn'), { title: 'Social Media Coordinator', company: 'Lune Cafe', place: 'Melbourne, Victoria' })
+  assert.deepStrictEqual(splitTitle('Event Photographer Job in Richmond, Melbourne VIC - SEEK'), { title: 'Event Photographer', company: '', place: 'Richmond, Melbourne VIC' })
+  assert.strictEqual(linkKey('https://www.seek.com.au/job/81234567?type=standard'), linkKey('https://seek.com.au/job/81234567/'))
+  assert.notStrictEqual(linkKey('https://au.indeed.com/viewjob?jk=abc'), linkKey('https://au.indeed.com/viewjob?jk=def'))
+  assert.strictEqual(siteOf('https://au.indeed.com/viewjob?jk=abc'), 'Indeed')
+  console.log('job share tests passed')
+}

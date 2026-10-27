@@ -4,7 +4,7 @@ export type Owner = 'chi' | 'michael'
 export type PKind = 'step' | 'tick' | 'idea' | 'goal' | 'task'
 export interface ProjItem { id: string; owner: Owner; kind: PKind; title: string; sub: string; cat: string; num1: number; day: string | null; sort: number }
 export type JobStatus = 'new' | 'saved' | 'applied' | 'hidden'
-export interface Job { id: string; title: string; company: string; place: string; pay: string; url: string; posted: string | null; search: string; kind: string; first_seen: string; status: JobStatus }
+export interface Job { id: string; title: string; company: string; place: string; pay: string; url: string; posted: string | null; search: string; kind: string; first_seen: string; status: JobStatus; address?: string }
 export interface JobSearch { id: string; what: string; place: string; sort: number }
 
 const KEY = 'home-sweet-home.projects.v1'
@@ -62,3 +62,35 @@ export async function refreshJobs(): Promise<number> {
 }
 export const seekUrl = (s: JobSearch) => `https://www.seek.com.au/jobs?keywords=${encodeURIComponent(s.what.trim())}${s.place.trim() ? `&where=${encodeURIComponent(s.place.trim())}` : ''}&sortmode=ListedDate`
 export const linkedinUrl = (s: JobSearch) => `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(s.what)}&location=${encodeURIComponent(s.place.trim() ? `${s.place.trim()}, Victoria, Australia` : 'Australia')}&sortBy=DD`
+
+export const indeedUrl = (s: JobSearch) => `https://au.indeed.com/jobs?q=${encodeURIComponent(s.what.trim())}${s.place.trim() ? `&l=${encodeURIComponent(s.place.trim())}` : ''}&sort=date`
+export const joraUrl = (s: JobSearch) => `https://au.jora.com/j?q=${encodeURIComponent(s.what.trim())}${s.place.trim() ? `&l=${encodeURIComponent(s.place.trim())}` : ''}&st=date`
+export const mapsUrl = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+
+/** Change a job's title or company (e.g. when a shared ad came through without them). */
+export async function updateJob(id: string, f: Partial<Pick<Job, 'title' | 'company' | 'address'>>) {
+  if (!supabase) { keep(JKEY, local<Job[]>(JKEY, []).map(j => (j.id === id ? { ...j, ...f } : j))); return }
+  const { error } = await supabase.from('jobs').update(f).eq('id', id); if (error) throw error
+}
+/** Look up the company's address on Google Maps (server side). Returns '' when none was found. */
+export async function findJobAddress(id: string): Promise<string> {
+  if (!supabase) return ''
+  const tok = (await supabase.auth.getSession()).data.session?.access_token || ''
+  const r = await fetch('/api/job-address', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(j.error || `Could not look up the address (${r.status}).`)
+  return j.address || ''
+}
+/** The private key inside the iPad Share button's link. Made once, kept in the database. */
+export async function shareKey(renew = false): Promise<string> {
+  const make = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), b => b.toString(16).padStart(2, '0')).join('')
+  if (!supabase) return 'demo-key'
+  if (!renew) {
+    const { data, error } = await supabase.from('app_keys').select('value').eq('id', 'job_share').maybeSingle()
+    if (error) throw error
+    if (data?.value) return data.value as string
+  }
+  const value = make()
+  const { error } = await supabase.from('app_keys').upsert({ id: 'job_share', value }, { onConflict: 'id' }); if (error) throw error
+  return value
+}

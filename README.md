@@ -16,4 +16,5 @@ Until Supabase is connected the app runs in demo mode and saves on the device on
   from Google's job search (ads from Seek, LinkedIn, Indeed and company sites) through SerpApi's free plan.
   Add these in Vercel → Settings → Environment Variables, then redeploy:
   `SERPAPI_KEY` (free at serpapi.com → Your account → API key) and `SUPABASE_SERVICE_KEY` (Supabase → Project Settings → API → service_role).
+- Run `supabase/migrations/016_job_share.sql` for the iPad Share button and company addresses (Projects → Michael → Edit shows the Share button setup).
   Optional: `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` add Adzuna ads while its free test calls last.

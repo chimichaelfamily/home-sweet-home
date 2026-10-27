@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { logError } from './lib/errorlog.ts'
 import { fmtShort, today } from './lib/dates.ts'
 import type { Task } from './lib/types.ts'
 import { lockRegistered, lockSupported, lockUnlock } from './lib/privateData.ts'
 import {
-  linkedinUrl, loadJobs, loadProject, refreshJobs, routineStreak, saveProject, saveSearch, seekUrl, setJobStatus, tickId,
+  findJobAddress, indeedUrl, joraUrl, linkedinUrl, mapsUrl, shareKey, updateJob, loadJobs, loadProject, refreshJobs, routineStreak, saveProject, saveSearch, seekUrl, setJobStatus, tickId,
   type Job, type JobSearch, type JobStatus, type Owner, type PKind, type ProjItem,
 } from './lib/projectData.ts'
 
@@ -234,9 +234,15 @@ function JobBoard({ edit }: { edit: boolean }) {
   const [what, setWhat] = useState(''); const [place, setPlace] = useState('Melbourne')
   const reload = () => loadJobs().then(r => { setJobs(r.jobs); setSearches(r.searches); setRan(r.ran) }).catch(e => { logError('Jobs: loading', e); setMsg('Could not load jobs. Has 015_projects.sql been run?') })
   useEffect(() => { reload() }, [])
+  const patch = (id: string, f: Partial<Job>) => setJobs(js => js.map(x => (x.id === id ? { ...x, ...f } : x)).filter(x => x.status !== 'hidden'))
+  const lookUp = (id: string) => findJobAddress(id).then(address => { if (address) patch(id, { address }) }).catch(e => logError('Jobs: finding the address', e))
   const mark = (j: Job, status: JobStatus) => {
-    setJobs(jobs.map(x => (x.id === j.id ? { ...x, status } : x)).filter(x => x.status !== 'hidden'))
-    setJobStatus(j.id, status).catch(e => { logError('Jobs: saving', e); setMsg('Could not save.') })
+    patch(j.id, { status })
+    setJobStatus(j.id, status).then(() => { if (status === 'saved' && j.company && !j.address) lookUp(j.id) }).catch(e => { logError('Jobs: saving', e); setMsg('Could not save.') })
+  }
+  const rename = (j: Job, f: { title?: string; company?: string }) => {
+    patch(j.id, { ...f, ...(f.company !== undefined ? { address: '' } : {}) })
+    updateJob(j.id, { ...f, ...(f.company !== undefined ? { address: '' } : {}) }).then(() => { if (f.company) lookUp(j.id) }).catch(e => { logError('Jobs: saving', e); setMsg('Could not save.') })
   }
   const refresh = async () => {
     setBusy(true); setMsg('')
@@ -266,6 +272,7 @@ function JobBoard({ edit }: { edit: boolean }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => setOnly('')} className="chip" aria-pressed={!only}>All</button>
         {searches.map(s => <button key={s.id} onClick={() => setOnly(only === s.what ? '' : s.what)} className="chip" aria-pressed={only === s.what}>{s.what}</button>)}
+        {jobs.some(j => j.search === 'shared') && <button onClick={() => setOnly(only === 'shared' ? '' : 'shared')} className="chip" aria-pressed={only === 'shared'} style={{ textTransform: 'none' }}>Shared from iPad</button>}
       </div>
 
       {edit && (
@@ -287,20 +294,39 @@ function JobBoard({ edit }: { edit: boolean }) {
         </div>
       )}
 
+      {edit && <ShareSetup />}
+
       {shown.length === 0 && <div className="card muted" style={{ padding: 22, fontSize: 16, lineHeight: 1.5 }}>
         {view === 'new' ? (jobs.length ? 'No new ads here. Tomorrow at 7pm brings more.' : 'No ads yet. They arrive each evening at 7pm, or tap "Check now".') : view === 'saved' ? 'Tap Save on an ad to keep it here.' : 'Tap Applied on an ad once you send an application.'}
       </div>}
       {shown.map(j => (
         <div key={j.id} className="card job" style={{ padding: '14px 20px', display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-          <a href={j.url} target="_blank" rel="noopener noreferrer" style={{ flex: '1 1 320px', minWidth: 0, color: 'inherit', textDecoration: 'none' }}>
-            <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.25 }}>{j.title}</div>
-            <div className="muted" style={{ fontSize: 14, marginTop: 2 }}>{[j.company, j.place].filter(Boolean).join(' · ')}</div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6, fontSize: 13, fontWeight: 600 }}>
-              {j.pay && <span style={{ color: 'var(--accent)' }}>{j.pay}</span>}
-              {j.kind && <span className="muted">{j.kind}</span>}
-              <span className="muted">{age(j.posted)}</span>
+          {edit && view !== 'new' ? (
+            <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <input type="text" aria-label="Job title" defaultValue={j.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== j.title) rename(j, { title: v }) }} style={{ height: 40 }} />
+              <input type="text" aria-label="Company" placeholder="Company (used to find the address)" defaultValue={j.company} onBlur={e => { const v = e.target.value.trim(); if (v !== j.company) rename(j, { company: v }) }} style={{ height: 40 }} />
             </div>
-          </a>
+          ) : (
+          <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+            <a href={j.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
+              <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.25 }}>{j.title}</div>
+              <div className="muted" style={{ fontSize: 14, marginTop: 2 }}>{[j.company, j.place].filter(Boolean).join(' · ')}</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6, fontSize: 13, fontWeight: 600 }}>
+                {j.pay && <span style={{ color: 'var(--accent)' }}>{j.pay}</span>}
+                {j.kind && <span className="muted">{j.kind}</span>}
+                <span className="muted">{j.posted ? age(j.posted) : j.search === 'shared' ? `Saved ${age(j.first_seen).toLowerCase()}` : ''}</span>
+              </div>
+            </a>
+            {j.address ? (
+              <a href={mapsUrl(j.address)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 14, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0119 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>{j.address}
+              </a>
+            ) : view !== 'new' && (j.company
+              ? <button onClick={() => lookUp(j.id)} style={{ marginTop: 6, border: 'none', background: 'none', padding: 0, fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Find {j.company}'s address</button>
+              : <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>Tap Edit and add the company to find its address.</div>)}
+            <div><a href={j.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 4, fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>Open the ad ↗</a></div>
+          </div>
+          )}
           <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
             {view === 'new' && <><button className="btn small" style={{ height: 38 }} onClick={() => mark(j, 'saved')}>Save</button><button className="btn small outline" style={{ height: 38 }} onClick={() => mark(j, 'hidden')}>Not for me</button></>}
             {view === 'saved' && <><button className="btn small" style={{ height: 38 }} onClick={() => mark(j, 'applied')}>Applied</button><button className="btn small outline" style={{ height: 38 }} onClick={() => mark(j, 'new')}>Unsave</button></>}
@@ -310,14 +336,44 @@ function JobBoard({ edit }: { edit: boolean }) {
       ))}
 
       <div className="card" style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>Search Seek and LinkedIn directly</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {searches.map(s => <span key={s.id} style={{ display: 'flex', gap: 6 }}>
-            <a className="btn small outline" style={{ height: 38, fontSize: 13 }} href={seekUrl(s)} target="_blank" rel="noopener noreferrer">Seek: {s.what}</a>
-            <a className="btn small outline" style={{ height: 38, fontSize: 13 }} href={linkedinUrl(s)} target="_blank" rel="noopener noreferrer">LinkedIn: {s.what}</a>
-          </span>)}
-        </div>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>Search the job sites directly</div>
+        <div className="muted" style={{ fontSize: 13 }}>Found one you like? Tap Share on the ad, then "Save to job board".</div>
+        {searches.map(s => <div key={s.id} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ width: 170, fontSize: 14, fontWeight: 600, textTransform: 'capitalize' }}>{s.what}</span>
+          {([['Seek', seekUrl(s)], ['LinkedIn', linkedinUrl(s)], ['Indeed', indeedUrl(s)], ['Jora', joraUrl(s)]] as const).map(([n, u]) => <a key={n} className="btn small outline" style={{ height: 38, fontSize: 13 }} href={u} target="_blank" rel="noopener noreferrer">{n}</a>)}
+        </div>)}
       </div>
+    </div>
+  )
+}
+
+/** Edit mode: how to add "Save to job board" to the iPad's Share menu (an Apple Shortcut). */
+function ShareSetup() {
+  const [key, setKey] = useState('')
+  const [err, setErr] = useState('')
+  const [copied, setCopied] = useState(false)
+  useEffect(() => { shareKey().then(setKey).catch(e => { logError('Jobs: share key', e); setErr('Could not load the Share button key. Has 016_job_share.sql been run?') }) }, [])
+  const link = key ? `${location.origin}/api/save-job?key=${key}` : ''
+  const copy = () => { navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500) }).catch(() => setErr('Could not copy. Press and hold the link to copy it.')) }
+  const step = (n: number, body: ReactNode) => <li style={{ display: 'flex', gap: 10, fontSize: 15, lineHeight: 1.45 }}><b style={{ flex: 'none', width: 24, height: 24, borderRadius: '50%', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>{n}</b><span>{body}</span></li>
+  return (
+    <div className="card" style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontSize: 18, fontWeight: 600 }}>iPad Share button: "Save to job board"</div>
+      <div className="muted" style={{ fontSize: 14 }}>Set this up once on the iPad. Then on any ad in Seek, LinkedIn, Indeed or Safari, tap Share → Save to job board, and it lands in Saved with its link.</div>
+      {err && <div style={{ fontSize: 14, color: 'var(--late)' }}>{err}</div>}
+      {link && <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <code style={{ flex: '1 1 300px', minWidth: 0, padding: '10px 12px', borderRadius: 12, background: 'var(--faint)', border: '1px solid var(--border)', fontSize: 13, wordBreak: 'break-all', userSelect: 'all' }}>{link}</code>
+        <button className="btn small" onClick={copy}>{copied ? 'Copied' : 'Copy link'}</button>
+      </div>}
+      <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {step(1, <>Tap <b>Copy link</b> above.</>)}
+        {step(2, <>Open the <b>Shortcuts</b> app → <b>+</b> → name it <b>Save to job board</b>.</>)}
+        {step(3, <>Add the action <b>Get Contents of URL</b>. Paste the link as the URL. Tap the arrow: Method <b>POST</b>, Request Body <b>JSON</b>, add a <b>Text</b> field named <b>shared</b> and set its value to <b>Shortcut Input</b>.</>)}
+        {step(4, <>Add the action <b>Show Notification</b> and set it to <b>Contents of URL</b>, so you see "Saved to the job board".</>)}
+        {step(5, <>Tap <b>ⓘ</b> (Details) → turn on <b>Show in Share Sheet</b>, and allow <b>URLs</b>, <b>Text</b> and <b>Safari web pages</b>.</>)}
+        {step(6, <>Test it: open any Seek ad → Share → <b>Save to job board</b>. The first time, tap <b>Allow</b>.</>)}
+      </ol>
+      <div><button className="btn small outline" style={{ height: 36, fontSize: 13 }} onClick={() => { if (confirm('Make a new link? The old Share button stops working until you paste the new link into the Shortcut.')) shareKey(true).then(setKey).catch(() => setErr('Could not make a new link.')) }}>Make a new link</button></div>
     </div>
   )
 }
