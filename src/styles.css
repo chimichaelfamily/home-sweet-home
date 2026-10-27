@@ -205,14 +205,20 @@ textarea { height: auto !important; min-height: 120px; padding: 12px 14px; line-
 .chip { height: 36px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 1px solid var(--border); background: var(--card); color: var(--ink); text-transform: capitalize; }
 .chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .card.job a:active { opacity: .7; }
-/* Habits pill in the clock card (Settings → Habits → Pop-up) */
-.habit-pill { flex: none; height: 64px; padding: 0 16px 0 10px; border-radius: 20px; border: 1.5px solid rgba(255,255,255,.8); background: rgba(30,24,44,.24); color: #fff; display: flex; align-items: center; gap: 10px; text-shadow: none; font-family: inherit; }
-.habit-pill:active { transform: scale(.97); }
-.hp-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #fff; box-sizing: border-box; display: block; }
-.hp-dot.on { background: #fff; }
-.hp-bar { width: 96px; height: 6px; border-radius: 6px; background: rgba(255,255,255,.35); display: block; overflow: hidden; }
-.hp-bar i { display: block; height: 100%; background: #fff; border-radius: 6px; }
+/* Habits: glowing bar under the weather (Settings → Habits → Glowing bar); tapping it opens the pop-up */
+.habit-nudge { flex: none; height: 76px; border-radius: 24px; border: none; padding: 0 12px 0 14px; display: flex; align-items: center; gap: 14px; text-align: left; font-family: inherit; color: #fff; background: linear-gradient(100deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #fff)); animation: hn-glow 2.4s ease-in-out infinite; }
+.habit-nudge:active { transform: scale(.985); }
+.hn-face { position: relative; width: 48px; height: 48px; flex: none; display: block; }
+.hn-face > :not(.hn-ring) { position: relative; box-shadow: 0 0 0 2.5px #fff; border-radius: 50%; }
+.hn-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid #fff; animation: hn-ring 1.8s ease-out infinite; }
+.hn-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hn-title { font-size: 21px; font-weight: 800; letter-spacing: -.3px; }
+.hn-sub { font-size: 14px; font-weight: 500; opacity: .92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-cta { flex: none; height: 52px; padding: 0 20px; border-radius: 999px; background: #fff; color: var(--accent); display: flex; align-items: center; font-size: 16px; font-weight: 800; }
+.habit-nudge.done { animation: none; background: var(--card); color: var(--ink); border: 1.5px solid var(--border); }
+.habit-nudge.done .hn-cta { background: var(--faint); color: var(--ink); border: 1px solid var(--border); }
+@keyframes hn-glow { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent), 0 8px 22px color-mix(in srgb, var(--accent) 35%, transparent); } 50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 0%, transparent), 0 8px 22px color-mix(in srgb, var(--accent) 35%, transparent); } }
+@keyframes hn-ring { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(1.55); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .habit-nudge, .hn-ring { animation: none; } }
 .habit-sheet { width: min(94vw, 620px); }
-@media (max-width: 640px) { .habit-pill { height: 54px; padding: 0 12px 0 8px; } }
-.wx-content:has(.habit-pill) { gap: 12px; }
-@media (max-width: 640px) { .wx-content:has(.habit-pill) { flex-wrap: wrap; } .wx-content:has(.habit-pill) .habit-pill { order: 3; width: 100%; justify-content: flex-start; } }
+@media (max-width: 640px) { .habit-nudge { height: 68px; gap: 10px; } .hn-title { font-size: 18px; } .hn-cta { height: 44px; padding: 0 14px; font-size: 14px; } }

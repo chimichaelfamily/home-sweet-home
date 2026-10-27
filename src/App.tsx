@@ -347,19 +347,14 @@ function Home({ s, apply, onEdit, onEditRule, onAdd, onTick, goReminders }: { s:
             <div style={{ fontSize: 56, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{now.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: false })}</div>
             <div style={{ fontSize: 18, opacity: .9 }}>{now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
           </div>
-          {habitStyle === 'popup' && <HabitPill s={s} who={hwho} onOpen={() => setSheet(true)} />}
-          {wx ? (habitStyle === 'popup' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
-              <div style={{ fontSize: 44, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{wx.temp}°</div>
-              <div><div style={{ fontSize: 16, fontWeight: 600 }}>{wx.text}</div><div style={{ fontSize: 14, opacity: .9 }}>H {wx.hi}° · L {wx.lo}°</div></div>
-            </div>
-          ) : (
+          {wx ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ fontSize: 54, fontWeight: 600, letterSpacing: -2, lineHeight: 1 }}>{wx.temp}°</div>
               <div><div style={{ fontSize: 19, fontWeight: 600 }}>{wx.text}</div><div style={{ fontSize: 15, opacity: .9 }}>H {wx.hi}° · L {wx.lo}°</div><div style={{ fontSize: 15, opacity: .9 }}>Melbourne</div></div>
             </div>
-          )) : <div style={{ fontSize: 16, opacity: .9 }}>{habitStyle === 'popup' ? 'Weather…' : 'Melbourne weather loading…'}</div>}
+          ) : <div style={{ fontSize: 16, opacity: .9 }}>Melbourne weather loading…</div>}
         </WeatherScene>
+        {habitStyle === 'popup' && <HabitNudge s={s} who={hwho} onOpen={() => setSheet(true)} />}
         <Schedule />
         {habitStyle === 'card' && <div className="card" style={{ flex: 'none', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 24, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
@@ -382,20 +377,23 @@ function useHabitStyle(): [HabitStyle, (v: HabitStyle) => void] {
   return [v, set]
 }
 
-function HabitPill({ s, who, onOpen }: { s: State; who: 'linh' | 'michael'; onOpen: () => void }) {
+/** The glowing "habits left today" bar under the weather. Tapping it opens the habits pop-up. */
+function HabitNudge({ s, who, onOpen }: { s: State; who: 'linh' | 'michael'; onOpen: () => void }) {
   const t = today()
   const hs = s.habits.filter(h => h.person_id === who && h.active).sort((a, b) => a.sort - b.sort)
-  const done = hs.map(h => s.habitLogs.some(l => l.habit_id === h.id && l.day === t))
-  const n = done.filter(Boolean).length
+  const left = hs.filter(h => !s.habitLogs.some(l => l.habit_id === h.id && l.day === t))
+  const all = hs.length > 0 && left.length === 0
+  const names = left.slice(0, 3).map(h => h.name)
+  const more = left.length - names.length
+  const sub = all ? `${hs.length} of ${hs.length} done. Lovely.` : hs.length === 0 ? 'Add habits in Settings → Habits' : names.join(', ') + (more > 0 ? ` and ${more} more` : '')
   return (
-    <button className="habit-pill" onClick={onOpen} aria-label={`${PEOPLE[who]}'s habits: ${n} of ${hs.length} done today. Open habits`}>
-      <Face who={who} size={40} />
-      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
-        <span style={{ fontSize: 16, fontWeight: 700 }}>{n === hs.length && hs.length > 0 ? 'Habits all done' : `Habits ${n}/${hs.length}`}</span>
-        {hs.length <= 12
-          ? <span aria-hidden="true" style={{ display: 'flex', gap: 3 }}>{done.map((d, i) => <i key={i} className={'hp-dot' + (d ? ' on' : '')} />)}</span>
-          : <span aria-hidden="true" className="hp-bar"><i style={{ width: `${hs.length ? (n / hs.length) * 100 : 0}%` }} /></span>}
+    <button className={'habit-nudge' + (all ? ' done' : '')} onClick={onOpen} aria-label={`${PEOPLE[who]}: ${all ? 'all habits done today' : `${left.length} habits left today`}. Open habits`}>
+      <span className="hn-face">{!all && <i className="hn-ring" aria-hidden="true" />}<Face who={who} size={48} /></span>
+      <span className="hn-text">
+        <span className="hn-title">{all ? 'All habits done today' : left.length === 1 ? '1 habit left today' : `${left.length} habits left today`}</span>
+        <span className="hn-sub">{sub}</span>
       </span>
+      <span className="hn-cta">{all ? 'See' : 'Tick now'}</span>
     </button>
   )
 }
@@ -962,7 +960,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 30, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span className="muted" style={{ fontSize: 15 }}>On the Home screen:</span>
-                {([['popup', 'Pop-up in the clock card'], ['card', 'Card under the schedule']] as const).map(([k, l]) => <button key={k} aria-pressed={habitStyle === k} onClick={() => setHabitStyle(k)} style={{ height: 44, padding: '0 18px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: '1.5px solid var(--mborder)', background: habitStyle === k ? 'var(--accent)' : 'transparent', color: habitStyle === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+                {([['popup', 'Glowing bar under the weather'], ['card', 'Card under the schedule']] as const).map(([k, l]) => <button key={k} aria-pressed={habitStyle === k} onClick={() => setHabitStyle(k)} style={{ height: 44, padding: '0 18px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: '1.5px solid var(--mborder)', background: habitStyle === k ? 'var(--accent)' : 'transparent', color: habitStyle === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
               </div>
               {s.habits.filter(h => h.person_id === hwho && h.active).sort((a, b) => a.sort - b.sort).map(h => (
                 <div key={h.id} style={{ display: 'flex', gap: 10 }}>
