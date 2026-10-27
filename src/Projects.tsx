@@ -233,7 +233,14 @@ function JobBoard({ edit }: { edit: boolean }) {
   const [msg, setMsg] = useState('')
   const [what, setWhat] = useState(''); const [place, setPlace] = useState('Melbourne')
   const reload = () => loadJobs().then(r => { setJobs(r.jobs); setSearches(r.searches); setRan(r.ran) }).catch(e => { logError('Jobs: loading', e); setMsg('Could not load jobs. Has 015_projects.sql been run?') })
-  useEffect(() => { reload() }, [])
+  useEffect(() => {
+    reload()
+    // a job saved from Seek with the Share button shows up as soon as you come back to the app
+    const back = () => { if (document.visibilityState === 'visible') reload() }
+    document.addEventListener('visibilitychange', back); window.addEventListener('focus', back)
+    const t = window.setInterval(reload, 60000)
+    return () => { document.removeEventListener('visibilitychange', back); window.removeEventListener('focus', back); window.clearInterval(t) }
+  }, [])
   const patch = (id: string, f: Partial<Job>) => setJobs(js => js.map(x => (x.id === id ? { ...x, ...f } : x)).filter(x => x.status !== 'hidden'))
   const lookUp = (id: string) => findJobAddress(id).then(address => { if (address) patch(id, { address }) }).catch(e => logError('Jobs: finding the address', e))
   const mark = (j: Job, status: JobStatus) => {
