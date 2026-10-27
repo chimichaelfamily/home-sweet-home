@@ -216,3 +216,24 @@ import { playerSrc, youtubeId } from './embed.ts'
   assert.ok(p.src.includes('/embed/a1?') && p.src.includes('playlist=b2,c3') && p.src.includes('enablejsapi=1'))
   console.log('media tests passed')
 }
+
+import { routineStreak } from './routines.ts'
+{
+  const step = (id: string) => ({ id, owner: 'chi' as const, kind: 'step' as const, title: id, sub: '', cat: 'skin-am', num1: 0, day: null, sort: 0 })
+  const tick = (s: string, day: string) => ({ id: `tick-${s}-${day}`, owner: 'chi' as const, kind: 'tick' as const, title: s, sub: '', cat: 'skin-am', num1: 1, day, sort: 0 })
+  const steps = [step('a'), step('b')]
+  const ticks = [tick('a', '2026-10-25'), tick('b', '2026-10-25'), tick('a', '2026-10-26'), tick('b', '2026-10-26'), tick('a', '2026-10-27')]
+  assert.strictEqual(routineStreak(steps, ticks, '2026-10-27'), 2) // today unfinished does not break it
+  assert.strictEqual(routineStreak(steps, [...ticks, tick('b', '2026-10-27')], '2026-10-27'), 3)
+  assert.strictEqual(routineStreak(steps, ticks, '2026-10-29'), 0)
+  assert.strictEqual(routineStreak([], ticks, '2026-10-27'), 0)
+  console.log('routine tests passed')
+}
+
+import { toRow } from '../../api/jobs.js'
+{
+  const r = toRow({ id: 123, title: '<strong>Videographer</strong> &amp; Editor', company: { display_name: 'Acme' }, location: { display_name: 'Richmond, Melbourne' }, salary_min: 70000, salary_max: 85000, salary_is_predicted: '0', redirect_url: 'https://x', created: '2026-10-27T01:00:00Z', contract_time: 'full_time' }, 'videographer')
+  assert.strictEqual(r.id, 'adzuna-123'); assert.strictEqual(r.title, 'Videographer & Editor'); assert.strictEqual(r.pay, '$70k – $85k'); assert.strictEqual(r.kind, 'Full time'); assert.strictEqual(r.posted, '2026-10-27')
+  assert.strictEqual(toRow({ id: 1, title: 'x', salary_min: 50000, salary_is_predicted: '1', redirect_url: 'u' }, 'x').pay, '')
+  console.log('job tests passed')
+}

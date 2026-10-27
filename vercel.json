@@ -3,6 +3,14 @@
     {
       "path": "/api/keepalive",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/jobs?slot=summer",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/jobs?slot=winter",
+      "schedule": "0 9 * * *"
     }
   ],
   "functions": {
