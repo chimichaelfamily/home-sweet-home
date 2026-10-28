@@ -532,7 +532,8 @@ function JobBoard({ edit }: { edit: boolean }) {
     updateJob(j.id, g).then(() => { if (f.company) lookUp(j.id) }).catch(e => { logError('Jobs: saving', e); setMsg(/deadline/i.test(String(e?.message)) ? 'To keep closing dates, run 017_job_deadline.sql in Supabase.' : 'Could not save.') })
   }
   const WORKS = ['Full time', 'Part time', 'Casual', 'Contract']
-  const workOf = (k: string) => WORKS.find(w => k.toLowerCase().startsWith(w.toLowerCase())) || ''
+  const workOf = (k: string) => WORKS.find(w => k.toLowerCase().replace(/-/g, ' ').startsWith(w.toLowerCase())) || ''
+  const workText = (k: string) => k.split('·').map(x => x.trim()).filter(x => x && !/^via /i.test(x)).join(' · ')
   const viaOf = (k: string) => (k.match(/via [^·]+/) || [''])[0].trim()
   const closes = (d?: string | null) => { if (!d) return null; const n = Math.round((new Date(d).getTime() - new Date(t).getTime()) / 86400000); return { text: n < 0 ? `Closed ${fmtShort(d)}` : n === 0 ? 'Closes today' : n === 1 ? 'Closes tomorrow' : `Closes ${fmtShort(d)}`, soon: n >= 0 && n <= 3, past: n < 0 } }
   const refresh = async () => {
@@ -608,27 +609,32 @@ function JobBoard({ edit }: { edit: boolean }) {
             </div>
           ) : (
           <div style={{ flex: '1 1 320px', minWidth: 0 }}>
-            <a href={j.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
-              <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.25 }}>{j.title}</div>
-              <div className="muted" style={{ fontSize: 14, marginTop: 2 }}>{[j.company, j.place].filter(Boolean).join(' · ')}</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6, fontSize: 13, fontWeight: 600 }}>
-                {j.pay && <span style={{ color: 'var(--accent)' }}>{j.pay}</span>}
-                {j.kind && <span className="muted">{j.kind}</span>}
-                <span className="muted">{j.posted ? `Posted ${low(age(j.posted))}` : j.search === 'shared' ? `Saved ${low(age(j.first_seen))}` : ''}</span>
-                {(() => { const c = closes(j.deadline); return c && <span style={{ color: c.soon ? 'var(--late)' : c.past ? 'var(--muted)' : 'var(--ink)', fontWeight: 700 }}>{c.text}</span> })()}
-              </div>
+            {/* company as the heading, then the position and details, then the link to the ad, then where it is */}
+            <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.25 }}>{j.company || j.title}</div>
+            {j.company && <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{j.title}</div>}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6, fontSize: 13, fontWeight: 600 }}>
+              {j.pay && <span style={{ color: 'var(--accent)' }}>{j.pay}</span>}
+              {workText(j.kind) && <span>{workText(j.kind)}</span>}
+              <span className="muted">{j.posted ? `Posted ${low(age(j.posted))}` : j.search === 'shared' ? `Saved ${low(age(j.first_seen))}` : ''}</span>
+              {(() => { const c = closes(j.deadline); return c && <span style={{ color: c.soon ? 'var(--late)' : c.past ? 'var(--muted)' : 'var(--ink)', fontWeight: 700 }}>{c.text}</span> })()}
+            </div>
+            <a href={j.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 14, fontWeight: 700, color: 'var(--seg-on)', textDecoration: 'none' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5" /></svg>
+              Open on {viaOf(j.kind).replace(/^via\s*/, '') || 'the job site'}
             </a>
-            {j.address ? (
-              <a href={mapsUrl(j.address)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 14, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0119 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>{j.address}
-              </a>
-            ) : view !== 'new' && (j.company
+            {(j.place || j.address) && <div style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 14 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none', marginTop: 2, color: 'var(--accent)' }}><path d="M12 21s-7-6.2-7-11.5A7 7 0 0119 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+              <span>
+                {j.place && <span style={{ fontWeight: 600 }}>{j.place}</span>}
+                {j.address && <a href={mapsUrl(j.address)} target="_blank" rel="noopener noreferrer" style={{ display: 'block', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>{j.address}</a>}
+              </span>
+            </div>}
+            {!j.address && view !== 'new' && (j.company
               ? <button onClick={() => lookUp(j.id)} style={{ marginTop: 6, border: 'none', background: 'none', padding: 0, fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Find {j.company}'s address</button>
               : <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <button className="btn small outline" style={{ height: 34, fontSize: 13 }} disabled={finding === j.id} onClick={() => lookUp(j.id)}>{finding === j.id ? 'Looking…' : 'Find details'}</button>
                   <span className="muted" style={{ fontSize: 13 }}>or tap Edit to type the company</span>
                 </div>)}
-            <div><a href={j.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 4, fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>Open the ad ↗</a></div>
           </div>
           )}
           <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
