@@ -14,6 +14,7 @@ export function parseShared(text) {
   const bare = full ? '' : (t.match(/(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com\.au|com|net\.au|au)\/[^\s<>"']+/i) || [])[0]
   const url = (full || (bare ? 'https://' + bare : '')).replace(/[).,]+$/, '')
   let rest = clean(t.replace(full || bare || url, ' '))
+    .replace(/^check out this job at (.+?):\s*(.+)$/i, '$2 at $1')
     .replace(/^(check out this job( on (seek|linkedin|indeed))?|i found this job( on (seek|linkedin|indeed))?|job:|have a look at this job)[:!.\-–\s]*/i, '')
     .replace(/[-–|]\s*(seek|linkedin|indeed)\s*$/i, '').trim()
   if (/^https?:/i.test(rest) || looksLikeLink(rest)) rest = ''
@@ -24,7 +25,9 @@ export function parseShared(text) {
 export function splitTitle(raw) {
   let s = clean(raw).replace(/\s*[-–|]\s*(seek|linkedin|indeed(\.com)?)\s*$/i, '').trim()
   let company = '', place = ''
-  let m = s.match(/^(.+?) hiring (.+?)(?: in (.+))?$/i)
+  let m = s.match(/^([^|]+?)\s*\|\s*([^|]+?)$/)
+  if (m && !/ hiring /i.test(s)) return { title: m[1].trim(), company: m[2].trim(), place: '' }
+  m = s.match(/^(.+?) hiring (.+?)(?: in (.+))?$/i)
   if (m) return { title: m[2].trim(), company: m[1].trim(), place: (m[3] || '').trim() }
   m = s.match(/^(.+?) job in (.+)$/i)
   if (m) { s = m[1].trim(); place = m[2].trim() }
@@ -135,6 +138,35 @@ export async function googleDetails(url, serpKey) {
     if (!t.company) { const m = String(hit.snippet || '').match(/^([A-Z][\w&'.\- ]{1,60}?) (?:is (?:seeking|looking|hiring)|are (?:seeking|looking|hiring))/); if (m) t.company = clean(m[1]) }
     return t
   } catch { return { title: '', company: '', place: '' } }
+}
+
+/** Pages that are a sign-in wall or a block, not the ad (LinkedIn returns these to apps). */
+export const isBlockedPage = html => !html || html.length < 4000 || /authwall|status code 999|Join LinkedIn|Sign in to view/i.test(String(html).slice(0, 6000))
+
+/** Find the same job in Google's job listings (through SerpApi) to fill in salary, work type, location and posted date.
+ *  Used when the ad page could not be read (LinkedIn blocks it). One search; only a result from the same company is used. */
+export async function googleJobDetails(title, company, serpKey, now = new Date()) {
+  const none = { pay: '', work: '', place: '', posted: '', company: '' }
+  if (!title || !serpKey) return none
+  const q = new URLSearchParams({ engine: 'google_jobs', q: [title, company].filter(Boolean).join(' '), hl: 'en', gl: 'au', google_domain: 'google.com.au', location: 'Australia', api_key: serpKey })
+  try {
+    const r = await fetch(`https://serpapi.com/search.json?${q}`)
+    if (!r.ok) return none
+    const j = await r.json()
+    const n = v => clean(v).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    const list = j.jobs_results || []
+    const hit = list.find(x => company && (n(x.company_name).includes(n(company)) || n(company).includes(n(x.company_name))) && (n(x.title).includes(n(title).split(' ')[0]) || n(title).includes(n(x.title).split(' ')[0])))
+      || (!company ? list.find(x => n(x.title) === n(title)) : null)
+    if (!hit) return none
+    const de = hit.detected_extensions || {}
+    const m = String(de.posted_at || '').toLowerCase().match(/(\d+|an?|one)\+?\s*(minute|hour|day|week|month)s?\s*ago/)
+    const days = m ? ({ minute: 0, hour: 0, day: 1, week: 7, month: 30 }[m[2]] * (/^\d+$/.test(m[1]) ? Number(m[1]) : 1)) : null
+    return {
+      pay: clean(de.salary || ''), work: workLabel(String(de.schedule_type || '').split(/,|\band\b/).map(x => x.trim()).filter(Boolean)), place: clean(hit.location || ''),
+      posted: days === null ? '' : new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(new Date(now.getTime() - days * 86400000)),
+      company: clean(hit.company_name || ''),
+    }
+  } catch { return none }
 }
 
 /** The company's address from Google Maps (through SerpApi). One search; returns '' when nothing clear is found. */

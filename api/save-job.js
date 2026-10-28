@@ -2,7 +2,7 @@
 // It puts the job in Michael's Saved list with its link, and looks up the company's address when it knows the company.
 // The Shortcut calls: POST /api/save-job?key=<the key from Projects → Michael → Edit → iPad Share button>
 // with a form field "shared" holding whatever the Share menu gave it (a link, or text with a link in it).
-import { decodePage, findAddress, googleDetails, linkKey, looksLikeLink, MEL_DAY, pageTitle, parsePage, parseShared, siteOf, splitTitle } from './_jobshare.js'
+import { decodePage, findAddress, googleDetails, googleJobDetails, isBlockedPage, linkKey, looksLikeLink, MEL_DAY, pageTitle, parsePage, parseShared, siteOf, splitTitle } from './_jobshare.js'
 
 const say = (res, code, text) => { res.status(code).setHeader('Content-Type', 'text/plain; charset=utf-8'); res.send(text) }
 
@@ -25,12 +25,19 @@ export default async function handler(req, res) {
 
   // 1) the ad page the iPad opened and sent (has everything), 2) what came with the share, 3) the page from here, 4) Google
   const pageRaw = decodePage(b && typeof b === 'object' ? b.page : '')
-  const pg = parsePage(pageRaw)
+  const blocked = isBlockedPage(pageRaw)
+  // a sign-in wall or block page is not the ad: do not read a title out of it
+  const pg = blocked ? parsePage('') : parsePage(pageRaw)
   let title = pg.title || got.title, company = pg.company || got.company, place = pg.place || got.place
-  const pay = pg.pay, work = pg.work, deadline = pg.deadline || null, posted = pg.posted || null
+  let pay = pg.pay, work = pg.work, posted = pg.posted || null
+  const deadline = pg.deadline || null
   if (!title || !company) { const t = splitTitle(await pageTitle(got.url)); title = title || t.title; company = company || t.company; place = place || t.place }
   if (!title) { const g = await googleDetails(got.url, serp); title = g.title; company = company || g.company; place = place || g.place }
   const site = siteOf(got.url)
+  // LinkedIn (and some others) will not let the iPad read the ad: fill the rest from Google's job listings
+  let gj = { pay: '', work: '', place: '', posted: '' }
+  if (title && (!pay || !work) && (blocked || !pg.title)) gj = await googleJobDetails(title, company, serp)
+  pay = pay || gj.pay; work = work || gj.work; place = place || gj.place; posted = posted || gj.posted || null
   const placeholder = `${site || 'Job'} ad (tap to open)`
   if (!title) title = placeholder
   const id = linkKey(got.url)
@@ -45,7 +52,8 @@ export default async function handler(req, res) {
   // what the notification on the iPad says, so it is clear what came through
   const fmt = d => { if (!d) return ''; const [y, m, dd] = d.split('-').map(Number); return `${dd} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]}` }
   const summary = (t, f) => [t + (f.company ? ` at ${f.company}` : ''), f.pay, f.work, f.place, f.deadline && `closes ${fmt(f.deadline)}`].filter(Boolean).join(' · ')
-  const hint = pageRaw.length > 1000 ? '' : '\n(Only the link came through. Update the Shortcut: Projects → Michael → Edit, steps 3–6.)'
+  const hint = pageRaw.length < 200 ? '\n(Only the link came through. Update the Shortcut: Projects → Michael → Edit, steps 3–6.)'
+    : blocked && site === 'LinkedIn' ? `\n(LinkedIn would not let the iPad read the ad${gj.pay || gj.work ? ', so the details came from Google' : '. Tap Edit on the job to add anything missing'}.)` : ''
   // retry without the closing date if 017_job_deadline.sql has not been run yet
   const write = async (path, init, body) => {
     let r = await db(path, { ...init, body: JSON.stringify(body) })

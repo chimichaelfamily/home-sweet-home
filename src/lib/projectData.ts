@@ -73,14 +73,14 @@ export async function updateJob(id: string, f: Partial<Pick<Job, 'title' | 'comp
   const { error } = await supabase.from('jobs').update(f).eq('id', id); if (error) throw error
 }
 /** Fill in a saved job's missing details (title, company, place) from Google, then find the company's address. */
-export async function findJobAddress(id: string): Promise<Partial<Pick<Job, 'title' | 'company' | 'place' | 'address'>>> {
+export async function findJobAddress(id: string): Promise<Partial<Pick<Job, 'title' | 'company' | 'place' | 'address' | 'pay' | 'kind' | 'posted'>>> {
   if (!supabase) return {}
   const tok = (await supabase.auth.getSession()).data.session?.access_token || ''
   const r = await fetch('/api/job-address', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(j.error || `Could not look up the details (${r.status}).`)
-  const { address, title, company, place } = j as Record<string, string | undefined>
-  return Object.fromEntries(Object.entries({ address, title, company, place }).filter(([, v]) => v)) as Partial<Job>
+  const { address, title, company, place, pay, kind, posted } = j as Record<string, string | undefined>
+  return Object.fromEntries(Object.entries({ address, title, company, place, pay, kind, posted }).filter(([, v]) => v)) as Partial<Job>
 }
 /** The private key inside the iPad Share button's link. Made once, kept in the database. */
 export async function shareKey(renew = false): Promise<string> {

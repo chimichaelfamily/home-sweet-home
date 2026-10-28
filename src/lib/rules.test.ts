@@ -321,3 +321,13 @@ import { looksLikeLink } from '../../api/_jobshare.js'
   assert.ok(looksLikeLink('seek.com.au/job/64326843')); assert.ok(!looksLikeLink('Senior Videographer & Producer'))
   console.log('bare link tests passed')
 }
+
+import { isBlockedPage } from '../../api/_jobshare.js'
+{
+  assert.deepStrictEqual(parseShared('Check out this job at Contour Education: Content Producer / Videographer https://www.linkedin.com/jobs/view/4474123498').title, 'Content Producer / Videographer')
+  assert.strictEqual(parseShared('Check out this job at Contour Education: Content Producer / Videographer https://www.linkedin.com/jobs/view/4474123498').company, 'Contour Education')
+  assert.deepStrictEqual(splitTitle('Content Producer / Videographer | Contour Education | LinkedIn'), { title: 'Content Producer / Videographer', company: 'Contour Education', place: '' })
+  assert.deepStrictEqual(splitTitle('Contour Education hiring Content Producer in Melbourne, Victoria, Australia | LinkedIn'), { title: 'Content Producer', company: 'Contour Education', place: 'Melbourne, Victoria, Australia' })
+  assert.ok(isBlockedPage('<html>tiny</html>')); assert.ok(!isBlockedPage('x'.repeat(5000)))
+  console.log('linkedin tests passed')
+}

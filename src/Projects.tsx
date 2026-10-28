@@ -635,6 +635,7 @@ function JobBoard({ edit }: { edit: boolean }) {
                 {j.address && <a href={mapsUrl(j.address)} target="_blank" rel="noopener noreferrer" style={{ display: 'block', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>{j.address}</a>}
               </span>
             </div>}
+            {view !== 'new' && j.company && (!j.pay || !workOf(j.kind)) && <button onClick={() => lookUp(j.id)} disabled={finding === j.id} style={{ marginTop: 6, marginRight: 12, border: 'none', background: 'none', padding: 0, fontSize: 13, fontWeight: 600, color: 'var(--seg-on)' }}>{finding === j.id ? 'Looking…' : 'Find salary & work type'}</button>}
             {!j.address && view !== 'new' && (j.company
               ? <button onClick={() => lookUp(j.id)} style={{ marginTop: 6, border: 'none', background: 'none', padding: 0, fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Find {j.company}'s address</button>
               : <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
