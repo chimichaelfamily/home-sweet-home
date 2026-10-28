@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { emptyState, load, loadCalLinks, saveCalLink, loadMorning, saveMorning, type MItem, save, supabase, usingDatabase, type CalLinks } from './lib/backend.ts'
 import { Private } from './Private.tsx'
 import { Projects } from './Projects.tsx'
@@ -25,13 +25,20 @@ import { addDays, diffDays, dowShort, fmtLong, fmtShort, isoToYmd, today } from 
 import { daysLate, headsUps, nextDue, status, type Rule, type Unit } from './lib/rules.ts'
 import { PEOPLE, POINTS, SIZE_LABEL, type Op, type PEvent, type Size, type State, type Task, type Who } from './lib/types.ts'
 
-type Tab = 'home' | 'habits' | 'morning' | 'private' | 'projects' | 'calendar' | 'ask' | 'weekly' | 'products' | 'reminders' | 'points' | 'knowledge' | 'settings'
+type Tab = 'home' | 'habits' | 'morning' | 'private' | 'projects' | 'calendar' | 'weekly' | 'points' | 'others' | 'settings'
+type OtherTab = 'knowledge' | 'ask' | 'reminders' | 'products'
 type Pending = { kind: 'task' | 'rule'; id: string; title: string; size: Size } | null
 const THEMES = [
   { id: 'lilac', name: 'Lilac haze', note: 'Lavender, dusty pink' },
   { id: 'warm', name: 'Warm soft', note: 'Cream and plum' },
   { id: 'minimal', name: 'Calm minimal', note: 'Grey-green and sage' },
 ]
+
+const navIcon = (d: ReactNode) => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}>{d}</svg>
+const NAV_ICON: Partial<Record<Tab, ReactNode>> = {
+  private: navIcon(<><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></>),
+  weekly: navIcon(<><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M8 16v-3M12 16V9M16 16v-5" /></>),
+}
 
 export default function App() {
   const [state, setState] = useState<State | null>(null)
@@ -50,6 +57,7 @@ export default function App() {
   useEffect(() => { document.documentElement.dataset.mode = dark ? 'dark' : 'light'; try { localStorage.setItem('hsh.mode', mode) } catch { /* ignore */ } }, [dark, mode])
   const [errs, setErrs] = useState(unseenCount())
   const [openSec, setOpenSec] = useState<'errors' | 'reminders' | null>(null)
+  const [other, setOther] = useState<OtherTab>('knowledge')
   useEffect(() => { installGlobalHandlers(); const f = () => setErrs(unseenCount()); window.addEventListener('hsh-errors', f); return () => window.removeEventListener('hsh-errors', f) }, [])
 
   useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem('hsh.theme', theme) } catch { /* ignore */ } }, [theme])
@@ -89,21 +97,31 @@ export default function App() {
     <div className="app">
       {error && <div className="card" style={{ padding: '10px 18px', color: 'var(--late)', fontWeight: 600 }}>{error} <button className="btn small outline" onClick={() => setError(null)}>Dismiss</button></div>}
       <div className="main">
-        {tab === 'home' && <Home s={state} apply={apply} onEdit={setEditing} onEditRule={setEditingRule} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => { setTab('settings'); setOpenSec('reminders') }} />}
+        {tab === 'home' && <Home s={state} apply={apply} onEdit={setEditing} onEditRule={setEditingRule} onAdd={() => setAdding(true)} onTick={setPending} goReminders={() => { setTab('others'); setOther('reminders') }} />}
         {tab === 'habits' && <Habits s={state} apply={apply} />}
         {tab === 'calendar' && <MonthCalendar />}
         {tab === 'morning' && <Morning />}
         {tab === 'private' && <Private tasks={state.tasks} onPush={title => { const r = A.addTask(state, title, 'baby'); apply(r); return r.state.tasks[r.state.tasks.length - 1].id }} />}
         {tab === 'projects' && <Projects tasks={state.tasks} onPush={title => { const r = A.addTask(state, title, 'baby'); apply(r); return r.state.tasks[r.state.tasks.length - 1].id }} />}
-        <div className="keep" style={{ height: '100%', display: tab === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
         <div style={{ height: '100%', display: tab === 'weekly' ? 'block' : 'none' }}><Weekly s={state} /></div>
-        <div style={{ height: '100%', display: tab === 'knowledge' ? 'block' : 'none' }}><Knowledge /></div>
+        {/* Others: Knowledge, AI chat, Reminders, Expired products. AI chat and Knowledge stay loaded so a chat or a page is not lost when switching. */}
+        <div style={{ height: '100%', display: tab === 'others' ? 'flex' : 'none', flexDirection: 'column', gap: 12 }}>
+          <div className="sub-tabs" style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto', flex: 'none' }}>
+            {([['knowledge', 'Knowledge'], ['ask', 'AI chat'], ['reminders', 'Reminders'], ['products', 'Expired products']] as [OtherTab, string][]).map(([k, l]) => <button key={k} aria-pressed={other === k} onClick={() => setOther(k)} style={{ flex: 'none', whiteSpace: 'nowrap', height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: other === k ? 'var(--accent)' : 'transparent', color: other === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+          </div>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <div style={{ height: '100%', display: other === 'knowledge' ? 'block' : 'none' }}><Knowledge /></div>
+            <div className="keep" style={{ height: '100%', display: other === 'ask' ? 'block' : 'none' }}><Ask s={state} /></div>
+            {other === 'reminders' && <div className="scroll" style={{ height: '100%' }}><Reminders s={state} apply={apply} onDone={setPending} /></div>}
+            {other === 'products' && <div style={{ height: '100%', minWidth: 0 }}><Products /></div>}
+          </div>
+        </div>
         {tab === 'points' && <Points s={state} apply={apply} />}
         {tab === 'settings' && <Settings s={state} apply={apply} theme={theme} setTheme={setTheme} mode={mode} setMode={setMode} openSec={openSec} clearOpen={() => setOpenSec(null)} onDone={setPending} />}
       </div>
       <nav className="nav">
-        {([['home', 'Home'], ['calendar', 'Calendar'], ['points', 'Points'], ['habits', 'Habits'], ['morning', 'Affirmation'], ['private', 'Goals'], ['projects', 'Projects'], ['weekly', 'Report'], ['knowledge', 'Knowledge'], ['ask', 'AI chat'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
-          <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{id === 'private' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: -1 }}><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>}{label}</button>
+        {([['home', 'Home'], ['calendar', 'Calendar'], ['morning', 'Affirmation'], ['points', 'Points'], ['habits', 'Habits'], ['weekly', 'Report'], ['projects', 'Projects'], ['private', 'Goals'], ['others', 'Others'], ['settings', 'Settings']] as [Tab, string][]).map(([id, label]) => (
+          <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{NAV_ICON[id]}{label}</button>
         ))}
         {errs > 0 ? <span className="status" style={{ fontSize: 14, color: 'var(--late)', fontWeight: 600, cursor: 'pointer' }} onClick={() => { setTab('settings'); setOpenSec('errors') }}>Something went wrong: see Settings → Logs</span> : <span className="muted status" style={{ fontSize: 14 }}>{!usingDatabase ? 'Demo mode: saved on this iPad only' : ''}</span>}
       </nav>
@@ -914,7 +932,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
       <div style={{ fontSize: 36, fontWeight: 600 }}>Settings</div>
       <div className="cols" style={{ flex: 1, minHeight: 0, display: 'flex', gap: 16 }}>
         <div className="card side" style={{ width: 280, flex: 'none', padding: 14, display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', minHeight: 0 }}>
-          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['faceid', 'Face ID'], ['habits', 'Habits'], ['reminders', 'Reminders'], ['rules', `Rules (${s.rules.length})`], ['products', 'Expired products'], ['goodreads', 'Goodreads'], ['errors', 'Logs']] as const).map(([id, l]) => (
+          {([['look', 'Theme'], ['calendars', 'Calendars'], ['faces', 'Faces'], ['faceid', 'Face ID'], ['habits', 'Habits'], ['rules', `Rules (${s.rules.length})`], ['goodreads', 'Goodreads'], ['errors', 'Logs']] as const).map(([id, l]) => (
             <button key={id} onClick={() => setSec(id)} style={{ flex: 'none', minHeight: 56, textAlign: 'left', borderRadius: 16, border: 'none', padding: '0 18px', fontSize: 19, fontWeight: 600, background: sec === id ? 'var(--accent)' : 'transparent', color: sec === id ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>
           ))}
         </div>
