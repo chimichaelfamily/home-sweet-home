@@ -297,3 +297,4 @@ html[data-theme='warm'], html[data-theme='minimal'] { --seg-on: #2F6DB5; }
 html[data-mode='dark'] .ot:not(.on) { color: color-mix(in srgb, var(--c) 45%, #fff); }
 
 .job-open:active { opacity: .6; }
+.job-open-chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--seg-on); background: var(--blue-bg); border: 1px solid color-mix(in srgb, var(--seg-on) 30%, transparent); }

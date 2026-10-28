@@ -2,7 +2,7 @@
 // It puts the job in Michael's Saved list with its link, and looks up the company's address when it knows the company.
 // The Shortcut calls: POST /api/save-job?key=<the key from Projects → Michael → Edit → iPad Share button>
 // with a form field "shared" holding whatever the Share menu gave it (a link, or text with a link in it).
-import { decodePage, findAddress, googleDetails, linkKey, MEL_DAY, pageTitle, parsePage, parseShared, siteOf, splitTitle } from './_jobshare.js'
+import { decodePage, findAddress, googleDetails, linkKey, looksLikeLink, MEL_DAY, pageTitle, parsePage, parseShared, siteOf, splitTitle } from './_jobshare.js'
 
 const say = (res, code, text) => { res.status(code).setHeader('Content-Type', 'text/plain; charset=utf-8'); res.send(text) }
 
@@ -58,7 +58,7 @@ export default async function handler(req, res) {
   const old = ex.ok ? (await ex.json())[0] : null
   if (old) {
     const f = { status: 'saved' }
-    if (title !== placeholder && (!old.title || / ad \(tap to open\)$/.test(old.title))) f.title = title
+    if (title !== placeholder && (!old.title || / ad \(tap to open\)$/.test(old.title) || looksLikeLink(old.title))) f.title = title
     if (company && !old.company) f.company = company
     if (place && !old.place) f.place = place
     if (pay && !old.pay) f.pay = pay

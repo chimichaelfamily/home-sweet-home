@@ -3,14 +3,20 @@
 
 const clean = s => String(s || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&#39;|&apos;|&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim()
 
+/** Text that is really a web address (so it is never used as a job title). */
+export const looksLikeLink = s => /^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+\/\S*$/i.test(String(s || '').trim())
+
 /** The link and whatever title text came with a share. */
 export function parseShared(text) {
   const t = String(text || '')
-  const url = (t.match(/https?:\/\/[^\s<>"']+/) || [])[0]?.replace(/[).,]+$/, '') || ''
-  let rest = clean(t.replace(url, ' '))
+  // a full link, or a bare one like "seek.com.au/job/12345" (the Seek app sometimes shares it without https://)
+  const full = (t.match(/https?:\/\/[^\s<>"']+/) || [])[0]
+  const bare = full ? '' : (t.match(/(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com\.au|com|net\.au|au)\/[^\s<>"']+/i) || [])[0]
+  const url = (full || (bare ? 'https://' + bare : '')).replace(/[).,]+$/, '')
+  let rest = clean(t.replace(full || bare || url, ' '))
     .replace(/^(check out this job( on (seek|linkedin|indeed))?|i found this job( on (seek|linkedin|indeed))?|job:|have a look at this job)[:!.\-–\s]*/i, '')
     .replace(/[-–|]\s*(seek|linkedin|indeed)\s*$/i, '').trim()
-  if (/^https?:/i.test(rest)) rest = ''
+  if (/^https?:/i.test(rest) || looksLikeLink(rest)) rest = ''
   return { url, ...splitTitle(rest) }
 }
 

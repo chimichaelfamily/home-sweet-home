@@ -312,3 +312,12 @@ import { DEFAULT_STAGES, nextStageId, parseStages, stageOf } from './routines.ts
   assert.strictEqual(linkKey('https://www.seek.com.au/job/95508938'), linkKey('https://au.seek.com/job/95508938?type=standard'))
   console.log('real seek page tests passed')
 }
+
+import { looksLikeLink } from '../../api/_jobshare.js'
+{
+  const a = parseShared('seek.com.au/job/64326843')
+  assert.strictEqual(a.url, 'https://seek.com.au/job/64326843'); assert.strictEqual(a.title, '')
+  assert.strictEqual(parseShared('Videographer at Bright https://au.seek.com/job/1').title, 'Videographer')
+  assert.ok(looksLikeLink('seek.com.au/job/64326843')); assert.ok(!looksLikeLink('Senior Videographer & Producer'))
+  console.log('bare link tests passed')
+}

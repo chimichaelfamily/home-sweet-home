@@ -546,6 +546,7 @@ function JobBoard({ edit }: { edit: boolean }) {
   const t = today()
   const shown = jobs.filter(j => j.status === view && (!only || j.search === only))
   const count = (v: JobView) => jobs.filter(j => j.status === v).length
+  const isLink = (x: string) => /^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+\/\S*$/i.test((x || '').trim())
   const low = (x: string) => (/^\d/.test(x) ? x : x.toLowerCase())
   const age = (d: string | null) => { if (!d) return ''; const n = Math.round((new Date(t).getTime() - new Date(d).getTime()) / 86400000); return n <= 0 ? 'Today' : n === 1 ? 'Yesterday' : n < 7 ? `${n} days ago` : fmtShort(d) }
   const ranText = ran ? `Last checked ${new Date(ran.ran_at).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).toLowerCase()} · checks daily at 7pm` : 'Checks Google job search (Seek, LinkedIn, Indeed and more) every day at 7pm'
@@ -611,8 +612,15 @@ function JobBoard({ edit }: { edit: boolean }) {
           <div style={{ flex: '1 1 320px', minWidth: 0 }}>
             {/* company as the heading, then the position and details (tap any of them to open the ad), then where it is */}
             <a href={j.url} target="_blank" rel="noopener noreferrer" aria-label={`Open the ad: ${j.title}${j.company ? ' at ' + j.company : ''}`} className="job-open" style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
-              <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.25 }}>{j.company || j.title}</div>
-              {j.company && <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{j.title}</div>}
+              {(() => {
+                // a title that is only a web address (an early share) is not shown; the Open button takes you to the ad
+                const pos = isLink(j.title) ? '' : j.title
+                const open = <span className="job-open-chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5" /></svg>Open</span>
+                return <>
+                  <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.25, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{j.company || pos || `${viaOf(j.kind).replace(/^via\s*/, '') || 'Job'} ad`}{!(j.company && pos) && open}</div>
+                  {j.company && pos && <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{pos}{open}</div>}
+                </>
+              })()}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6, fontSize: 13, fontWeight: 600 }}>
                 {j.pay && <span style={{ color: 'var(--accent)' }}>{j.pay}</span>}
                 {workText(j.kind) && <span>{workText(j.kind)}</span>}
