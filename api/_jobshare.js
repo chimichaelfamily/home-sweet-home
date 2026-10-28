@@ -39,7 +39,7 @@ export function siteOf(url) {
 /** Stable id for a shared link, ignoring tracking bits after "?" (Seek and Indeed keep the job number in the path or jk=). */
 export function linkKey(url) {
   let u = url
-  try { const x = new URL(url); const jk = x.searchParams.get('jk') || x.searchParams.get('currentJobId'); u = x.hostname.replace(/^www\./, '') + x.pathname.replace(/\/$/, '') + (jk ? '#' + jk : '') } catch { /* keep */ }
+  try { const x = new URL(url); const jk = x.searchParams.get('jk') || x.searchParams.get('currentJobId'); u = x.hostname.replace(/^www\./, '').replace(/^seek\.com\.au$/, 'au.seek.com') + x.pathname.replace(/\/$/, '') + (jk ? '#' + jk : '') } catch { /* keep */ }
   let h = 2166136261
   for (const c of u.toLowerCase()) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0 }
   return 'link-' + h.toString(36)
@@ -58,39 +58,49 @@ export async function pageTitle(url) {
   } catch { return '' }
 }
 
-/** Pull the job title, company, place and pay out of an ad page's HTML (sent by the iPad, which can open the ad).
- *  Uses the page's job data (JSON-LD JobPosting) when present, then common patterns, then the page title. */
+const WORK = { FULL_TIME: 'Full time', PART_TIME: 'Part time', CASUAL: 'Casual', CONTRACT_TEMP: 'Contract', CONTRACT: 'Contract', CONTRACTOR: 'Contract', TEMPORARY: 'Temporary', INTERN: 'Internship', INTERNSHIP: 'Internship', VOLUNTEER: 'Volunteer', PER_DIEM: 'Casual' }
+const workLabel = v => [].concat(v || []).map(x => WORK[String(x).toUpperCase().replace(/[\s-]+/g, '_')] || clean(String(x)).replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase())).filter(Boolean).join(', ')
+const melDay = iso => { try { return iso ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(new Date(iso)) : '' } catch { return '' } }
+
+/** Pull the job details out of an ad page's HTML (sent by the iPad, which can open the ad).
+ *  Seek: the page's own job data and its labelled fields. LinkedIn, Indeed and most others: JSON-LD JobPosting.
+ *  Returns title, company, place, pay, work (Full time / Part time / Casual / Contract), deadline and posted (YYYY-MM-DD). */
 export function parsePage(html) {
-  const out = { title: '', company: '', place: '', pay: '' }
+  const out = { title: '', company: '', place: '', pay: '', work: '', deadline: '', posted: '' }
   if (!html) return out
   const h = String(html)
+  const unq = v => clean(String(v).replace(/\\u002F/gi, '/').replace(/\\u0026/gi, '&').replace(/\\"/g, '"'))
+  const auto = name => { const m = h.match(new RegExp(`data-automation=["']${name}["'][^>]*>([\\s\\S]{0,600}?)</(?:h1|h2|span|div|a|p)>`)); return m ? clean(m[1]) : '' }
+  // JSON-LD JobPosting (LinkedIn, Indeed, company sites)
   for (const m of h.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
     try {
       const j = JSON.parse(m[1].trim())
-      const list = [].concat(j['@graph'] || j)
-      const jp = list.find(x => x && /JobPosting/i.test(String(x['@type'])))
-      if (jp) {
-        out.title = clean(jp.title)
-        out.company = clean(jp.hiringOrganization?.name || '')
-        const loc = [].concat(jp.jobLocation || [])[0]?.address
-        out.place = clean(loc ? [loc.addressLocality, loc.addressRegion].filter(Boolean).join(', ') : '')
-        const bs = jp.baseSalary?.value
-        if (bs && (bs.minValue || bs.maxValue)) out.pay = [bs.minValue, bs.maxValue].filter(Boolean).map(n => '$' + Math.round(n).toLocaleString('en-AU')).join(' – ')
-        break
-      }
+      const jp = [].concat(j['@graph'] || j).find(x => x && /JobPosting/i.test(String(x['@type'])))
+      if (!jp) continue
+      out.title = clean(jp.title)
+      out.company = clean(jp.hiringOrganization?.name || '')
+      const loc = [].concat(jp.jobLocation || [])[0]?.address
+      out.place = clean(loc ? [loc.addressLocality, loc.addressRegion].filter(Boolean).join(', ') : '')
+      const bs = jp.baseSalary?.value
+      if (bs && (bs.minValue || bs.maxValue || bs.value)) out.pay = [bs.minValue || bs.value, bs.maxValue].filter(Boolean).map(n => '$' + Math.round(n).toLocaleString('en-AU')).join(' – ') + (bs.unitText && /hour/i.test(bs.unitText) ? ' an hour' : '')
+      out.work = workLabel(jp.employmentType)
+      out.deadline = melDay(jp.validThrough)
+      out.posted = melDay(jp.datePosted)
+      break
     } catch { /* not JSON */ }
   }
-  const unq = v => clean(String(v).replace(/\\u0026/g, '&').replace(/\\"/g, '"'))
-  if (!out.company) {
-    const m = h.match(/"advertiser"\s*:\s*\{[^{}]*?"(?:name|description)"\s*:\s*"([^"]{2,120})"/) || h.match(/"(?:advertiserName|companyName|hiringOrganizationName)"\s*:\s*"([^"]{2,120})"/) || h.match(/data-automation=["']advertiser-name["'][^>]*>([^<]{2,120})</)
-    if (m) out.company = unq(m[1])
-  }
-  if (!out.place) { const m = h.match(/data-automation=["']job-detail-location["'][^>]*>([^<]{2,120})</); if (m) out.place = unq(m[1]) }
+  // Seek's labelled fields and its job data
+  out.title = out.title || auto('job-detail-title')
+  out.company = out.company || unq((h.match(/"advertiser":\{"__typename":"Advertiser","id":"[^"]*","name":"([^"]{1,140})"/) || h.match(/"advertiser"\s*:\s*\{[^{}]*?"name"\s*:\s*"([^"]{2,140})"/) || h.match(/"(?:advertiserName|companyName|hiringOrganizationName)"\s*:\s*"([^"]{2,140})"/) || [])[1] || '') || auto('advertiser-name')
+  out.place = out.place || auto('job-detail-location')
+  out.pay = out.pay || auto('job-detail-salary') || unq((h.match(/"salary":\{"__typename":"JobSalary"[^{}]*?"label":"([^"]{2,120})"/) || [])[1] || '')
+  out.work = out.work || auto('job-detail-work-type') || workLabel(((h.match(/"workTypes":\{[^{}]*?"label":\[([^\]]*)\]/) || [])[1] || '').match(/[A-Z_]+/g))
+  out.deadline = out.deadline || melDay((h.match(/"expiresAt":\{[^{}]*?"dateTimeUtc":"([^"]+)"/) || [])[1])
+  out.posted = out.posted || melDay((h.match(/"listedAt":\{[^{}]*?"dateTimeUtc":"([^"]+)"/) || [])[1])
   if (!out.title) {
-    const m = h.match(/data-automation=["']job-detail-title["'][^>]*>([^<]{2,160})</)
     const og = h.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) || h.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i)
     const tt = h.match(/<title[^>]*>([^<]+)<\/title>/i)
-    const t = splitTitle(m ? m[1] : og ? og[1] : tt ? tt[1] : '')
+    const t = splitTitle(og ? og[1] : tt ? tt[1] : '')
     out.title = t.title; out.company = out.company || t.company; out.place = out.place || t.place
   }
   return out

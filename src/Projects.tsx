@@ -526,10 +526,15 @@ function JobBoard({ edit }: { edit: boolean }) {
     patch(j.id, { status })
     setJobStatus(j.id, status).then(() => { if (status === 'saved' && j.company && !j.address) lookUp(j.id) }).catch(e => { logError('Jobs: saving', e); setMsg('Could not save.') })
   }
-  const rename = (j: Job, f: { title?: string; company?: string }) => {
-    patch(j.id, { ...f, ...(f.company !== undefined ? { address: '' } : {}) })
-    updateJob(j.id, { ...f, ...(f.company !== undefined ? { address: '' } : {}) }).then(() => { if (f.company) lookUp(j.id) }).catch(e => { logError('Jobs: saving', e); setMsg('Could not save.') })
+  const rename = (j: Job, f: Partial<Pick<Job, 'title' | 'company' | 'pay' | 'place' | 'kind' | 'deadline'>>) => {
+    const g = { ...f, ...(f.company !== undefined ? { address: '' } : {}) }
+    patch(j.id, g)
+    updateJob(j.id, g).then(() => { if (f.company) lookUp(j.id) }).catch(e => { logError('Jobs: saving', e); setMsg(/deadline/i.test(String(e?.message)) ? 'To keep closing dates, run 017_job_deadline.sql in Supabase.' : 'Could not save.') })
   }
+  const WORKS = ['Full time', 'Part time', 'Casual', 'Contract']
+  const workOf = (k: string) => WORKS.find(w => k.toLowerCase().startsWith(w.toLowerCase())) || ''
+  const viaOf = (k: string) => (k.match(/via [^·]+/) || [''])[0].trim()
+  const closes = (d?: string | null) => { if (!d) return null; const n = Math.round((new Date(d).getTime() - new Date(t).getTime()) / 86400000); return { text: n < 0 ? `Closed ${fmtShort(d)}` : n === 0 ? 'Closes today' : n === 1 ? 'Closes tomorrow' : `Closes ${fmtShort(d)}`, soon: n >= 0 && n <= 3, past: n < 0 } }
   const refresh = async () => {
     setBusy(true); setMsg('')
     try { const n = await refreshJobs(); await reload(); setMsg(`Checked just now: ${n} ads found.`) } catch (e) { setMsg(String((e as Error).message || e)) } finally { setBusy(false) }
@@ -540,6 +545,7 @@ function JobBoard({ edit }: { edit: boolean }) {
   const t = today()
   const shown = jobs.filter(j => j.status === view && (!only || j.search === only))
   const count = (v: JobView) => jobs.filter(j => j.status === v).length
+  const low = (x: string) => (/^\d/.test(x) ? x : x.toLowerCase())
   const age = (d: string | null) => { if (!d) return ''; const n = Math.round((new Date(t).getTime() - new Date(d).getTime()) / 86400000); return n <= 0 ? 'Today' : n === 1 ? 'Yesterday' : n < 7 ? `${n} days ago` : fmtShort(d) }
   const ranText = ran ? `Last checked ${new Date(ran.ran_at).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' }).toLowerCase()} · checks daily at 7pm` : 'Checks Google job search (Seek, LinkedIn, Indeed and more) every day at 7pm'
   return (
@@ -591,6 +597,14 @@ function JobBoard({ edit }: { edit: boolean }) {
             <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
               <input type="text" aria-label="Job title" defaultValue={j.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== j.title) rename(j, { title: v }) }} style={{ height: 40 }} />
               <input type="text" aria-label="Company" placeholder="Company (used to find the address)" defaultValue={j.company} onBlur={e => { const v = e.target.value.trim(); if (v !== j.company) rename(j, { company: v }) }} style={{ height: 40 }} />
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <input type="text" aria-label="Salary" placeholder="Salary" defaultValue={j.pay} onBlur={e => { const v = e.target.value.trim(); if (v !== j.pay) rename(j, { pay: v }) }} style={{ flex: '1 1 140px', minWidth: 0, height: 40 }} />
+                <input type="text" aria-label="Location" placeholder="Location" defaultValue={j.place} onBlur={e => { const v = e.target.value.trim(); if (v !== j.place) rename(j, { place: v }) }} style={{ flex: '1 1 140px', minWidth: 0, height: 40 }} />
+                <select aria-label="Work type" defaultValue={workOf(j.kind)} onChange={e => rename(j, { kind: [e.target.value, viaOf(j.kind)].filter(Boolean).join(' · ') })} style={{ flex: '0 1 140px', height: 40 }}>
+                  <option value="">Work type</option>{WORKS.map(w => <option key={w}>{w}</option>)}
+                </select>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>Closes<input type="date" aria-label="Closing date" defaultValue={j.deadline || ''} onChange={e => rename(j, { deadline: e.target.value || null })} style={{ height: 40 }} /></label>
+              </div>
             </div>
           ) : (
           <div style={{ flex: '1 1 320px', minWidth: 0 }}>
@@ -600,7 +614,8 @@ function JobBoard({ edit }: { edit: boolean }) {
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6, fontSize: 13, fontWeight: 600 }}>
                 {j.pay && <span style={{ color: 'var(--accent)' }}>{j.pay}</span>}
                 {j.kind && <span className="muted">{j.kind}</span>}
-                <span className="muted">{j.posted ? age(j.posted) : j.search === 'shared' ? `Saved ${age(j.first_seen).toLowerCase()}` : ''}</span>
+                <span className="muted">{j.posted ? `Posted ${low(age(j.posted))}` : j.search === 'shared' ? `Saved ${low(age(j.first_seen))}` : ''}</span>
+                {(() => { const c = closes(j.deadline); return c && <span style={{ color: c.soon ? 'var(--late)' : c.past ? 'var(--muted)' : 'var(--ink)', fontWeight: 700 }}>{c.text}</span> })()}
               </div>
             </a>
             {j.address ? (

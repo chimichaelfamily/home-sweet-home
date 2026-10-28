@@ -4,7 +4,7 @@ export type Owner = 'chi' | 'michael'
 export type PKind = 'step' | 'tick' | 'idea' | 'goal' | 'task'
 export interface ProjItem { id: string; owner: Owner; kind: PKind; title: string; sub: string; cat: string; num1: number; day: string | null; sort: number }
 export type JobStatus = 'new' | 'saved' | 'applied' | 'hidden'
-export interface Job { id: string; title: string; company: string; place: string; pay: string; url: string; posted: string | null; search: string; kind: string; first_seen: string; status: JobStatus; address?: string }
+export interface Job { id: string; title: string; company: string; place: string; pay: string; url: string; posted: string | null; search: string; kind: string; first_seen: string; status: JobStatus; address?: string; deadline?: string | null }
 export interface JobSearch { id: string; what: string; place: string; sort: number }
 
 const KEY = 'home-sweet-home.projects.v1'
@@ -68,7 +68,7 @@ export const joraUrl = (s: JobSearch) => `https://au.jora.com/j?q=${encodeURICom
 export const mapsUrl = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
 
 /** Change a job's title or company (e.g. when a shared ad came through without them). */
-export async function updateJob(id: string, f: Partial<Pick<Job, 'title' | 'company' | 'address'>>) {
+export async function updateJob(id: string, f: Partial<Pick<Job, 'title' | 'company' | 'address' | 'pay' | 'place' | 'kind' | 'deadline'>>) {
   if (!supabase) { keep(JKEY, local<Job[]>(JKEY, []).map(j => (j.id === id ? { ...j, ...f } : j))); return }
   const { error } = await supabase.from('jobs').update(f).eq('id', id); if (error) throw error
 }

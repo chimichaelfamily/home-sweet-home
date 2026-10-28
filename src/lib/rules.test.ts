@@ -263,9 +263,9 @@ import { decodePage, linkKey, parsePage, parseShared, siteOf, splitTitle } from 
 
 {
   const ld = '<html><head><script type="application/ld+json">{"@type":"JobPosting","title":"Videographer","hiringOrganization":{"name":"Bright Studio"},"jobLocation":{"address":{"addressLocality":"Richmond","addressRegion":"VIC"}},"baseSalary":{"value":{"minValue":70000,"maxValue":85000}}}</script></head></html>'
-  assert.deepStrictEqual(parsePage(ld), { title: 'Videographer', company: 'Bright Studio', place: 'Richmond, VIC', pay: '$70,000 – $85,000' })
+  assert.deepStrictEqual(parsePage(ld), { title: 'Videographer', company: 'Bright Studio', place: 'Richmond, VIC', pay: '$70,000 – $85,000', work: '', deadline: '', posted: '' })
   const seek = '<title>Videographer Job in Richmond, Melbourne VIC - SEEK</title><span data-automation="advertiser-name">Bright Studio</span>'
-  assert.deepStrictEqual(parsePage(seek), { title: 'Videographer', company: 'Bright Studio', place: 'Richmond, Melbourne VIC', pay: '' })
+  assert.deepStrictEqual(parsePage(seek), { title: 'Videographer', company: 'Bright Studio', place: 'Richmond, Melbourne VIC', pay: '', work: '', deadline: '', posted: '' })
   const big = ld + ' '.repeat(50)
   assert.strictEqual(decodePage(Buffer.from(big).toString('base64')), big)
   assert.strictEqual(decodePage('plain text here'), 'plain text here')
@@ -299,4 +299,16 @@ import { DEFAULT_STAGES, nextStageId, parseStages, stageOf } from './routines.ts
   assert.strictEqual(nextStageId(st), 4); assert.strictEqual(nextStageId(DEFAULT_STAGES), 3)
   assert.strictEqual(stageOf(3, st), 3); assert.strictEqual(stageOf(9, st), 0)
   console.log('board stage tests passed')
+}
+
+{
+  const seekPage = '<h1 data-automation="job-detail-title">Senior Videographer &amp; Producer</h1><span data-automation="job-detail-location"><a href="/x">Albert Park, Melbourne VIC</a></span><span data-automation="job-detail-work-type"><a href="/y">Full time</a></span><span data-automation="job-detail-salary">$90,000 – $110,000 + Super</span>'
+    + '<script>{"advertiser":{"__typename":"Advertiser","id":"1","name":"Legacy Media Global"},"expiresAt":{"__typename":"SeekDateTime","dateTimeUtc":"2026-11-26T12:59:59.999Z"},"listedAt":{"__typename":"SeekDateTime","label":"1d ago","dateTimeUtc":"2026-10-26T23:00:00.000Z"}}</script>'
+  assert.deepStrictEqual(parsePage(seekPage), { title: 'Senior Videographer & Producer', company: 'Legacy Media Global', place: 'Albert Park, Melbourne VIC', pay: '$90,000 – $110,000 + Super', work: 'Full time', deadline: '2026-11-26', posted: '2026-10-27' })
+  const seekJsonOnly = '<script>{"workTypes":{"__typename":"GFJWorkTypes","label":["CASUAL"]}}</script>'
+  assert.strictEqual(parsePage(seekJsonOnly).work, 'Casual')
+  const li = '<script type="application/ld+json">{"@type":"JobPosting","title":"Photographer","hiringOrganization":{"name":"Snap Co"},"employmentType":["PART_TIME"],"validThrough":"2026-12-01T00:00:00Z","datePosted":"2026-10-20"}</script>'
+  const lp = parsePage(li); assert.strictEqual(lp.work, 'Part time'); assert.strictEqual(lp.deadline, '2026-12-01'); assert.strictEqual(lp.company, 'Snap Co')
+  assert.strictEqual(linkKey('https://www.seek.com.au/job/95508938'), linkKey('https://au.seek.com/job/95508938?type=standard'))
+  console.log('real seek page tests passed')
 }
