@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { logError } from './lib/errorlog.ts'
+import { Face } from './Face.tsx'
 import { fmtShort, today } from './lib/dates.ts'
 import type { Task } from './lib/types.ts'
 import { lockRegistered, lockSupported, lockUnlock } from './lib/privateData.ts'
@@ -11,7 +12,12 @@ import {
 const IDLE_MS = 2 * 60 * 1000
 type Push = (title: string) => string
 
+/** Projects opens straight away. Only Chi's MMO (business ideas) is behind Face ID, and it locks again after 2 minutes without a tap. */
 export function Projects({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
+  return <Inside tasks={tasks} onPush={onPush} />
+}
+
+function useMmoLock() {
   const [unlocked, setUnlocked] = useState(false)
   const [msg, setMsg] = useState('')
   const timer = useRef<number | undefined>(undefined)
@@ -23,16 +29,21 @@ export function Projects({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
     ev.forEach(e => window.addEventListener(e, arm))
     return () => { window.clearTimeout(timer.current); ev.forEach(e => window.removeEventListener(e, arm)) }
   }, [unlocked])
-  const go = async () => { setMsg(''); try { await lockUnlock(); setUnlocked(true) } catch { setMsg('Face ID did not match. Try again.') } }
-  if (unlocked) return <Inside onLock={() => setUnlocked(false)} tasks={tasks} onPush={onPush} />
+  const unlock = async () => { setMsg(''); try { await lockUnlock(); setUnlocked(true) } catch { setMsg('Face ID did not match. Try again.') } }
+  return { unlocked, unlock, lock: () => setUnlocked(false), msg }
+}
+
+function MmoLocked({ onUnlock, msg }: { onUnlock: () => void; msg: string }) {
   const registered = lockRegistered()
   return (
-    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 30 }}>
       <div className="card" style={{ width: 520, maxWidth: '100%', padding: 36, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ fontSize: 34, fontWeight: 600 }}>Personal projects</div>
-        <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Chi's routines and business ideas, Michael's job board.</div>
+        <div style={{ fontSize: 30, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>MMO
+        </div>
+        <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Business ideas, goals and tasks.</div>
         {!lockSupported() && <div style={{ fontSize: 15 }}>This browser does not support Face ID passkeys. Open the app from the Home Screen icon in Safari.</div>}
-        {lockSupported() && registered && <button className="btn" onClick={go}>Smile to unlock</button>}
+        {lockSupported() && registered && <button className="btn" onClick={onUnlock}>Smile to unlock</button>}
         {lockSupported() && !registered && <div className="muted" style={{ fontSize: 15 }}>Face ID is not set up on this device yet. Settings → Face ID.</div>}
         {msg && <div style={{ fontSize: 15 }}>{msg}</div>}
       </div>
@@ -40,7 +51,6 @@ export function Projects({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
   )
 }
 
-/** Tab row, same as the other tabs: main tabs use the theme colour; the smaller tabs inside a section (inner) are blue. */
 const Pills = <K extends string>({ value, set, opts, inner = false }: { value: K; set: (k: K) => void; opts: [K, string][]; inner?: boolean }) => (
   <div className={'sub-tabs' + (inner ? ' seg-inner' : '')} style={{ display: 'flex', gap: 4, padding: 4, background: inner ? undefined : 'var(--ground)', borderRadius: 999, overflowX: 'auto', maxWidth: '100%' }}>
     {opts.map(([k, l]) => <button key={k} className={inner && value === k ? 'on' : undefined} aria-pressed={value === k} onClick={() => set(k)} style={inner ? undefined : { flex: 'none', whiteSpace: 'nowrap', height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: value === k ? 'var(--accent)' : 'transparent', color: value === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
@@ -54,7 +64,8 @@ const Tick = ({ on, label, onClick, size = 30 }: { on: boolean; label: string; o
 const RM = ({ onClick, label }: { onClick: () => void; label: string }) => <button className="btn small outline" aria-label={label} style={{ height: 32, fontSize: 13, padding: '0 12px' }} onClick={onClick}>Remove</button>
 
 type Sub = 'skincare' | 'body' | 'diet' | 'mmo'
-function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; onPush: Push }) {
+function Inside({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
+  const mmo = useMmoLock()
   const [who, setWho] = useState<Owner>('chi')
   const [sub, setSub] = useState<Sub>('skincare')
   const [edit, setEdit] = useState(false)
@@ -76,10 +87,14 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="mc-head" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Projects</div>
-        <Pills value={who} set={setWho} opts={[['chi', 'Chi'], ['michael', 'Michael']]} />
+        <div role="group" aria-label="Whose projects" style={{ display: 'flex', gap: 6, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
+          {([['chi', 'linh', 'Chi'], ['michael', 'michael', 'Michael']] as const).map(([k, face, name]) => (
+            <button key={k} aria-label={`${name}'s projects`} aria-pressed={who === k} onClick={() => setWho(k)} style={{ padding: 3, borderRadius: 999, border: 'none', background: who === k ? 'var(--card)' : 'transparent', opacity: who === k ? 1 : .5, boxShadow: who === k ? '0 1px 6px rgba(0,0,0,.2)' : 'none' }}><Face who={face} size={40} /></button>
+          ))}
+        </div>
         <div style={{ flex: 1 }} />
-        <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>
-        <button className="btn small" onClick={onLock}>Lock</button>
+        {!(who === 'chi' && sub === 'mmo' && !mmo.unlocked) && <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>}
+        {mmo.unlocked && who === 'chi' && <button className="btn small" onClick={mmo.lock}>Lock MMO</button>}
       </div>
       {who === 'chi' && <Pills inner value={sub} set={setSub} opts={[['skincare', 'Skincare'], ['body', 'Body'], ['diet', 'Diet'], ['mmo', 'MMO']]} />}
       {err && <div style={{ fontSize: 14 }}>{err} <button className="btn small outline" style={{ height: 32 }} onClick={() => setErr('')}>OK</button></div>}
@@ -87,7 +102,7 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
         {who === 'chi' && sub === 'skincare' && <div className="proj-cols"><Routine {...ops} cat="skin-am" title="Morning skincare" hint="e.g. Cleanser, Vitamin C, Sunscreen" /><Routine {...ops} cat="skin-pm" title="Evening skincare" hint="e.g. Double cleanse, Retinol, Moisturiser" /></div>}
         {who === 'chi' && sub === 'body' && <Routine {...ops} cat="body" title="Body routine" hint="e.g. 30 min walk, Pilates, Stretch" detail="When or how much, e.g. Mon/Wed/Fri" />}
         {who === 'chi' && sub === 'diet' && <Routine {...ops} cat="diet" title="Diet routine" hint="e.g. Protein breakfast, 2L water, No snacks after 8pm" detail="Note, e.g. 7:30am" />}
-        {who === 'chi' && sub === 'mmo' && <Mmo {...ops} tasks={tasks} onPush={onPush} />}
+        {who === 'chi' && sub === 'mmo' && (mmo.unlocked ? <Mmo {...ops} tasks={tasks} onPush={onPush} /> : <MmoLocked onUnlock={mmo.unlock} msg={mmo.msg} />)}
         {who === 'michael' && <JobBoard edit={edit} />}
       </div>
     </div>
