@@ -102,7 +102,7 @@ function Inside({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
         {who === 'chi' && sub === 'skincare' && <><WeekPlan {...ops} cat="skin-am" title="Morning skincare" hint="e.g. Vitamin C serum" detail="Note, e.g. 2 drops" /><WeekPlan {...ops} cat="skin-pm" title="Evening skincare" hint="e.g. Retinol" detail="Note, e.g. pea-size, skip if irritated" /></>}
         {who === 'chi' && sub === 'body' && <WeekPlan {...ops} cat="body" title="Body plan" hint="e.g. Upper body" detail="Exercises, e.g. push-ups, rows, plank" />}
-        {who === 'chi' && sub === 'diet' && <Routine {...ops} cat="diet" title="Diet routine" hint="e.g. Protein breakfast, 2L water, No snacks after 8pm" detail="Note, e.g. 7:30am" />}
+        {who === 'chi' && sub === 'diet' && <CleanDays {...ops} />}
         {who === 'chi' && sub === 'mmo' && (mmo.unlocked ? <Kanban {...ops} tasks={tasks} onPush={onPush} /> : <MmoLocked onUnlock={mmo.unlock} msg={mmo.msg} />)}
         {who === 'michael' && <JobBoard edit={edit} />}
       </div>
@@ -112,54 +112,101 @@ function Inside({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
 
 interface Ops { items: ProjItem[]; edit: boolean; add: (k: PKind, f: Partial<ProjItem>) => void; upsert: (i: ProjItem) => void; remove: (id: string) => void }
 
-function Routine({ items, edit, add, upsert, remove, cat, title, hint, detail = 'Note (optional)' }: Ops & { cat: string; title: string; hint: string; detail?: string }) {
+const DIET_STARTERS = ['No sugar', 'No snacks', 'No oily food', 'No fast food']
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/** Diet: "clean days". Each rule (no sugar, no snacks…) gets a tick each day you kept it, a streak, and a month view. */
+function CleanDays({ items, edit, add, upsert, remove }: Ops) {
   const t = today()
-  const [name, setName] = useState(''); const [note, setNote] = useState('')
-  const steps = items.filter(x => x.kind === 'step' && x.cat === cat).sort((a, b) => a.sort - b.sort)
-  const ticks = items.filter(x => x.kind === 'tick' && x.cat === cat)
-  const doneToday = (s: ProjItem) => ticks.some(x => x.title === s.id && x.day === t)
-  const n = steps.filter(doneToday).length
-  const streak = routineStreak(steps, ticks, t)
-  const toggle = (s: ProjItem) => { const id = tickId(s.id, t); if (doneToday(s)) remove(id); else upsert({ id, owner: 'chi', kind: 'tick', title: s.id, sub: '', cat, num1: 1, day: t, sort: 0 }) }
-  const pct = steps.length ? Math.round((n / steps.length) * 100) : 0
+  const [name, setName] = useState('')
+  const [month, setMonth] = useState(t.slice(0, 7))
+  const rules = items.filter(x => x.kind === 'step' && x.cat === 'diet').sort((a, b) => a.sort - b.sort)
+  const ticks = items.filter(x => x.kind === 'tick' && x.cat === 'diet')
+  const kept = (r: ProjItem, d: string) => ticks.some(x => x.title === r.id && x.day === d)
+  const flip = (r: ProjItem, d: string) => { const id = tickId(r.id, d); if (kept(r, d)) remove(id); else upsert({ id, owner: 'chi', kind: 'tick', title: r.id, sub: '', cat: 'diet', num1: 1, day: d, sort: 0 }) }
+  const n = rules.filter(r => kept(r, t)).length
+  const [y, m] = month.split('-').map(Number)
+  const days = new Date(y, m, 0).getDate()
+  const dates = Array.from({ length: days }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)
+  const counted = dates.filter(d => d <= t)
+  const shift = (k: number) => { const d = new Date(y, m - 1 + k, 1); setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`) }
+  const allKept = rules.length > 0 && n === rules.length
   return (
-    <div className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>{title}</div>
-          <div className="muted" style={{ fontSize: 14 }}>{steps.length ? `${n} of ${steps.length} done today` : 'No steps yet'}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 22, fontWeight: 600 }}>Today's clean day</div>
+            <div className="muted" style={{ fontSize: 14 }}>{rules.length ? (allKept ? `All ${rules.length} kept today. Lovely.` : `${n} of ${rules.length} kept so far. Tick what you kept tonight.`) : 'Add the things you are cutting out.'}</div>
+          </div>
         </div>
-        {streak > 0 && <div style={{ textAlign: 'right' }}><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>{streak}</div><div className="muted" style={{ fontSize: 12, fontWeight: 600 }}>day streak</div></div>}
+        {rules.length > 0 && <div className="clean-grid">
+          {rules.map(r => {
+            const on = kept(r, t)
+            const st = routineStreak([r], ticks.filter(x => x.title === r.id), t)
+            return (
+              <div key={r.id} className={'clean-rule' + (on ? ' on' : '')}>
+                {edit ? (
+                  <>
+                    <input type="text" aria-label="Rule" defaultValue={r.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== r.title) upsert({ ...r, title: v }) }} style={{ flex: 1, minWidth: 0, height: 40 }} />
+                    <RM label={`Remove ${r.title}`} onClick={() => { ticks.filter(x => x.title === r.id).forEach(x => remove(x.id)); remove(r.id) }} />
+                  </>
+                ) : (
+                  <button className="clean-btn" aria-pressed={on} onClick={() => flip(r, t)}>
+                    <span className={'circle' + (on ? ' done' : '')} aria-hidden="true" style={{ width: 34, height: 34 }}>{on && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7" /></svg>}</span>
+                    <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <span style={{ display: 'block', fontSize: 17, fontWeight: 700 }}>{r.title}</span>
+                      <span className="muted" style={{ display: 'block', fontSize: 13 }}>{on ? 'Kept today' : 'Not ticked yet'}</span>
+                    </span>
+                    {st > 0 && <span style={{ textAlign: 'right' }}><span style={{ display: 'block', fontSize: 22, fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>{st}</span><span className="muted" style={{ fontSize: 11, fontWeight: 600 }}>{st === 1 ? 'day' : 'days'}</span></span>}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>}
+        {(edit || rules.length === 0) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {DIET_STARTERS.some(x => !rules.some(r => r.title.toLowerCase() === x.toLowerCase())) && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="muted" style={{ fontSize: 13 }}>Quick add:</span>
+              {DIET_STARTERS.filter(x => !rules.some(r => r.title.toLowerCase() === x.toLowerCase())).map(x => <button key={x} className="chip" style={{ textTransform: 'none' }} onClick={() => add('step', { cat: 'diet', title: x })}>+ {x}</button>)}
+            </div>}
+            <form style={{ display: 'flex', gap: 8 }} onSubmit={e => { e.preventDefault(); if (name.trim()) { add('step', { cat: 'diet', title: name.trim() }); setName('') } }}>
+              <input type="text" placeholder="Something else to cut, e.g. No bubble tea" value={name} onChange={e => setName(e.target.value)} style={{ flex: 1, minWidth: 0, height: 44 }} />
+              <button className="btn small" type="submit">Add</button>
+            </form>
+          </div>
+        )}
       </div>
-      {steps.length > 0 && <div style={{ height: 8, borderRadius: 8, background: 'var(--faint)' }}><div style={{ height: 8, borderRadius: 8, width: `${pct}%`, background: 'var(--accent)', transition: 'width .3s' }} /></div>}
-      <div>
-        {steps.map(s => {
-          const on = doneToday(s)
-          return (
-            <div key={s.id} className="row" style={{ minHeight: 50 }}>
-              <Tick on={on} label={on ? `Untick ${s.title}` : `Tick ${s.title}`} onClick={() => toggle(s)} />
-              {edit ? (
-                <div style={{ flex: 1, display: 'flex', gap: 8 }}>
-                  <input type="text" aria-label="Step" defaultValue={s.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== s.title) upsert({ ...s, title: v }) }} style={{ flex: 2, minWidth: 0, height: 40 }} />
-                  <input type="text" aria-label="Note" placeholder="Note" defaultValue={s.sub} onBlur={e => { const v = e.target.value.trim(); if (v !== s.sub) upsert({ ...s, sub: v }) }} style={{ flex: 1, minWidth: 0, height: 40 }} />
-                </div>
-              ) : (
-                <div style={{ flex: 1, minWidth: 0 }} onClick={() => toggle(s)}>
-                  <div style={{ fontSize: 17, fontWeight: 500, ...(on ? { color: 'var(--muted)', textDecoration: 'line-through' } : {}) }}>{s.title}</div>
-                  {s.sub && <div className="muted" style={{ fontSize: 13 }}>{s.sub}</div>}
-                </div>
-              )}
-              {edit && <RM label={`Remove ${s.title}`} onClick={() => { ticks.filter(x => x.title === s.id).forEach(x => remove(x.id)); remove(s.id) }} />}
-            </div>
-          )
-        })}
-      </div>
-      {(edit || steps.length === 0) && (
-        <form style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }} onSubmit={e => { e.preventDefault(); if (name.trim()) { add('step', { cat, title: name.trim(), sub: note.trim() }); setName(''); setNote('') } }}>
-          <input type="text" placeholder={hint} value={name} onChange={e => setName(e.target.value)} style={{ flex: '2 1 220px', minWidth: 0, height: 44 }} />
-          <input type="text" placeholder={detail} value={note} onChange={e => setNote(e.target.value)} style={{ flex: '1 1 140px', minWidth: 0, height: 44 }} />
-          <button className="btn small" type="submit">Add step</button>
-        </form>
+
+      {rules.length > 0 && (
+        <div className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 20, fontWeight: 600, flex: 1 }}>{MONTHS[m - 1]} {y}</div>
+            <button className="kb-mini" aria-label="Previous month" onClick={() => shift(-1)}>‹</button>
+            <button className="kb-mini" aria-label="Next month" disabled={month >= t.slice(0, 7)} onClick={() => shift(1)}>›</button>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="clean-month">
+              <thead><tr><th />{dates.map(d => <th key={d} className={d === t ? 'today' : ''}>{Number(d.slice(8))}</th>)}<th style={{ textAlign: 'right' }}>Kept</th></tr></thead>
+              <tbody>
+                {rules.map(r => {
+                  const k = counted.filter(d => kept(r, d)).length
+                  return (
+                    <tr key={r.id}>
+                      <td className="cm-name">{r.title}</td>
+                      {dates.map(d => d > t
+                        ? <td key={d}><span className="cm-cell future" /></td>
+                        : <td key={d} className={d === t ? 'today' : ''}><button className={'cm-cell' + (kept(r, d) ? ' on' : '')} aria-pressed={kept(r, d)} aria-label={`${r.title}, ${Number(d.slice(8))} ${MONTHS[m - 1]}`} onClick={() => flip(r, d)} /></td>)}
+                      <td className="cm-sum">{counted.length ? `${k}/${counted.length}` : '–'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="muted" style={{ fontSize: 12 }}>Filled = kept that day. Forgot to tick? Tap any past day to fix it. The lowest number on the right is the one to watch.</div>
+        </div>
       )}
     </div>
   )

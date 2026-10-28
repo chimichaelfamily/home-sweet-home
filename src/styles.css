@@ -260,3 +260,20 @@ html[data-theme='warm'], html[data-theme='minimal'] { --seg-on: #2F6DB5; }
 .kb-gap { height: 52px; border-radius: 16px; border: 2px dashed var(--accent); margin-bottom: 8px; }
 .kb-empty { font-size: 13px; color: var(--muted); padding: 14px 6px; text-align: center; border: 1.5px dashed var(--border); border-radius: 14px; }
 .kb-mini { height: 32px; min-width: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--mborder); background: var(--card); color: var(--ink); font-size: 12px; font-weight: 700; }
+
+/* Projects: diet clean days */
+.clean-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .clean-grid { grid-template-columns: 1fr; } }
+.clean-rule { display: flex; align-items: center; gap: 8px; }
+.clean-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; border-radius: 18px; border: 1.5px solid var(--border); background: var(--faint); color: var(--ink); font-family: inherit; }
+.clean-rule.on .clean-btn { background: color-mix(in srgb, var(--accent) 12%, var(--card)); border-color: color-mix(in srgb, var(--accent) 35%, var(--card)); }
+.clean-month { border-collapse: separate; border-spacing: 2px; width: 100%; }
+.clean-month th { font-size: 11px; font-weight: 600; color: var(--muted); padding: 2px 0; min-width: 20px; }
+.clean-month th.today { color: var(--accent); font-weight: 800; }
+.clean-month td { padding: 0; text-align: center; }
+.clean-month .cm-name { text-align: left; font-size: 14px; font-weight: 600; padding-right: 10px; white-space: nowrap; }
+.clean-month .cm-sum { text-align: right; font-size: 13px; font-weight: 700; padding-left: 8px; white-space: nowrap; }
+.cm-cell { display: block; width: 20px; height: 20px; margin: 0 auto; padding: 0; border-radius: 6px; border: 1.5px solid var(--mborder); background: transparent; box-sizing: border-box; }
+.cm-cell.on { background: var(--accent); border-color: var(--accent); }
+.cm-cell.future { border-style: dashed; opacity: .35; }
+.clean-month td.today .cm-cell { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
