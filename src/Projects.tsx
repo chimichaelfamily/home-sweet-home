@@ -256,8 +256,8 @@ function WeekPlan({ items, edit, add, upsert, remove, cat, title, hint, detail }
                       </div>
                     ) : (
                       <>
-                        <div style={{ fontSize: 16, fontWeight: 600 }}>{s.title}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>{[daysLabel(s.num1), s.sub].filter(Boolean).join(' · ')}</div>
+                        <div style={{ fontSize: 18, fontWeight: 600 }}>{s.title}</div>
+                        <div className="muted" style={{ fontSize: 13 }}>{[daysLabel(s.num1), s.sub].filter(Boolean).join(' · ')}</div>
                       </>
                     )}
                   </td>
@@ -265,7 +265,7 @@ function WeekPlan({ items, edit, add, upsert, remove, cat, title, hint, detail }
                     const planned = onDay(s, w.ymd)
                     if (edit) return <td key={w.d} className={w.i === ti ? 'today' : ''}><button className={'wp-day' + (planned ? ' on' : '')} aria-pressed={planned} aria-label={`${s.title} on ${w.d}`} onClick={() => upsert({ ...s, num1: toggleDay(s.num1, w.i) })}>{planned ? '✓' : ''}</button></td>
                     if (!planned) return <td key={w.d} className={w.i === ti ? 'today' : ''}><span className="wp-off" aria-label="Not planned">–</span></td>
-                    if (w.i === ti) return <td key={w.d} className="today"><Tick on={done(s, t)} label={done(s, t) ? `Untick ${s.title}` : `Tick ${s.title}`} onClick={() => toggle(s)} /></td>
+                    if (w.i === ti) return <td key={w.d} className="today"><Tick size={34} on={done(s, t)} label={done(s, t) ? `Untick ${s.title}` : `Tick ${s.title}`} onClick={() => toggle(s)} /></td>
                     const past = w.i < ti, got = done(s, w.ymd)
                     return <td key={w.d}><span className={'wp-dot' + (got ? ' got' : past ? ' missed' : '')} aria-label={got ? 'Done' : past ? 'Missed' : 'Planned'} /></td>
                   })}

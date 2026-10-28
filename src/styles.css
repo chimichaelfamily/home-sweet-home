@@ -228,13 +228,13 @@ textarea { height: auto !important; min-height: 120px; padding: 12px 14px; line-
 html[data-theme='warm'], html[data-theme='minimal'] { --seg-on: #2F6DB5; }
 
 /* Projects: weekly plan (skincare, body) */
-.week-plan th, .week-plan td { padding: 8px 6px; border-bottom: 1px solid var(--row); text-align: center; vertical-align: middle; }
+.week-plan th, .week-plan td { padding: 11px 6px; border-bottom: 1px solid var(--row); text-align: center; vertical-align: middle; }
 .week-plan th:first-child, .week-plan td:first-child { text-align: left; padding-left: 0; }
 .week-plan .today { background: color-mix(in srgb, var(--accent) 9%, transparent); }
 .week-plan th.today { border-radius: 12px 12px 0 0; color: var(--accent); }
 .week-plan tr:last-child td.today { border-radius: 0 0 12px 12px; }
 .week-plan td .circle { margin: 0 auto; }
-.wp-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--mborder); box-sizing: border-box; }
+.wp-dot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--mborder); box-sizing: border-box; }
 .wp-dot.got { background: var(--accent); border-color: var(--accent); }
 .wp-dot.missed { border-style: dashed; opacity: .6; }
 .wp-off { color: var(--border); font-weight: 700; }
