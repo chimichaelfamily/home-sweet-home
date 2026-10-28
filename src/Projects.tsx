@@ -137,7 +137,7 @@ function CleanDays({ items, edit, add, upsert, remove }: Ops) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 22, fontWeight: 600 }}>Today's clean day</div>
-            <div className="muted" style={{ fontSize: 14 }}>{rules.length ? (allKept ? `All ${rules.length} kept today. Lovely.` : `${n} of ${rules.length} kept so far. Tick what you kept tonight.`) : 'Add the things you are cutting out.'}</div>
+            {!rules.length && <div className="muted" style={{ fontSize: 14 }}>Add the things you are cutting out.</div>}
           </div>
         </div>
         {rules.length > 0 && <div className="clean-grid">
@@ -205,7 +205,6 @@ function CleanDays({ items, edit, add, upsert, remove }: Ops) {
               </tbody>
             </table>
           </div>
-          <div className="muted" style={{ fontSize: 12 }}>Filled = kept that day. Forgot to tick? Tap any past day to fix it. The lowest number on the right is the one to watch.</div>
         </div>
       )}
     </div>
@@ -275,13 +274,6 @@ function WeekPlan({ items, edit, add, upsert, remove, cat, title, hint, detail }
               ))}
             </tbody>
           </table>
-          {!edit && <div className="muted" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, marginTop: 8, alignItems: 'center' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span className="wp-dot got" /> done</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span className="wp-dot missed" /> missed</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span className="wp-dot" /> coming up</span>
-            <span>– not that day</span>
-            <span>Tap Edit to change which days.</span>
-          </div>}
         </div>
       )}
       {(edit || steps.length === 0) && (
@@ -352,7 +344,9 @@ type Drag = { id: string; from: Col; x: number; y: number; dx: number; dy: numbe
 
 function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onBack }: { p: ProjItem; cards: ProjItem[]; col: (it: ProjItem) => Col; homeTask: (it: ProjItem) => Task | undefined; edit: boolean; add: Ops['add']; upsert: Ops['upsert']; remove: Ops['remove']; onPush: Push; onBack: () => void }) {
   const [draft, setDraft] = useState('')
-  const [drag, setDrag] = useState<Drag | null>(null)
+  const [drag, setDragState] = useState<Drag | null>(null)
+  const dragRef = useRef<Drag | null>(null)
+  const setDrag = (d: Drag | null) => { dragRef.current = d; setDragState(d) }
   const colEls = useRef(new Map<Col, HTMLDivElement>())
   const cardEls = useRef(new Map<string, HTMLDivElement>())
   const inCol = (c: Col) => cards.filter(x => col(x) === c).sort((a, b) => a.sort - b.sort)
@@ -376,13 +370,35 @@ function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onB
       if (f.sort !== it.sort || f.num1 !== it.num1 || f.sub !== it.sub) upsert(f)
     })
   }
-  const move = (it: ProjItem, to: Col) => upsert({ ...it, num1: numOf(to), sort: Math.max(0, ...inCol(to).map(x => x.sort)) + 1, ...(to !== 'done' && homeTask(it)?.done_at ? { sub: '' } : {}) })
+  // Drag and drop that works with a finger on the iPad: follow the finger on the whole window, and stop the page scrolling meanwhile.
+  const latest = useRef({ target, drop }); latest.current = { target, drop }
+  const start = (e: RPointerEvent, it: ProjItem, c: Col, i: number, el: HTMLDivElement) => {
+    if (edit || e.button > 0) return
+    const r = el.getBoundingClientRect()
+    setDrag({ id: it.id, from: c, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, moved: false, to: c, at: i })
+    const sx = e.clientX, sy = e.clientY
+    const onMove = (ev: PointerEvent) => {
+      const d = dragRef.current; if (!d) return
+      const moved = d.moved || Math.hypot(ev.clientX - sx, ev.clientY - sy) > 6
+      setDrag({ ...d, x: ev.clientX, y: ev.clientY, moved, ...(moved ? latest.current.target(ev.clientX, ev.clientY, d.id) : {}) })
+    }
+    const noScroll = (ev: TouchEvent) => { if (dragRef.current) ev.preventDefault() }
+    const end = (drop: boolean) => () => {
+      const d = dragRef.current
+      window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('touchmove', noScroll)
+      if (drop && d?.moved) latest.current.drop(d)
+      setDrag(null)
+    }
+    const up = end(true), cancel = end(true)
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel)
+    window.addEventListener('touchmove', noScroll, { passive: false })
+  }
 
   const dragged = drag && cards.find(x => x.id === drag.id)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <button className="btn small outline" onClick={onBack}>‹ All projects</button>
+        <button className="btn small" onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, paddingLeft: 14 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>All projects</button>
         <div style={{ flex: 1, minWidth: 180 }}>
           <div style={{ fontSize: 24, fontWeight: 600 }}>{p.title}</div>
           {p.sub && <div className="muted" style={{ fontSize: 14 }}>{p.sub}</div>}
@@ -409,17 +425,13 @@ function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onB
                     {gapBefore && <div className="kb-gap" />}
                     <KCard it={it} c={c} home={homeTask(it)} edit={edit} faded={drag?.id === it.id && drag.moved}
                       setEl={el => { if (el) cardEls.current.set(it.id, el); else cardEls.current.delete(it.id) }}
-                      onDown={(e, el) => { if (edit) return; const r = el.getBoundingClientRect(); setDrag({ id: it.id, from: c, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, moved: false, to: c, at: i }) }}
-                      onMove={e => { if (!drag || drag.id !== it.id) return; const moved = drag.moved || Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8; setDrag({ ...drag, x: e.clientX, y: e.clientY, moved, ...(moved ? target(e.clientX, e.clientY, it.id) : {}) }) }}
-                      onUp={() => { if (drag?.moved) drop(drag); setDrag(null) }}
-                      onCancel={() => setDrag(null)}
-                      onMoveTo={to => move(it, to)}
+                      onDown={(e, el) => start(e, it, c, i, el)}
                       onRename={v => upsert({ ...it, title: v })} onRemove={() => remove(it.id)}
                       onToDo={() => { const id = onPush(it.title); upsert({ ...it, sub: 'task:' + id }) }} />
                   </div>
                 ))}
                 {showGap && drag!.at >= others && <div className="kb-gap" />}
-                {list.length === 0 && !showGap && <div className="kb-empty">{c === 'todo' ? 'Add a task below' : c === 'doing' ? 'Drag a task here when you start it' : 'Finished tasks land here'}</div>}
+                {list.length === 0 && !showGap && <div className="kb-empty" />}
               </div>
               {c === 'todo' && <form style={{ display: 'flex', gap: 6, marginTop: 8 }} onSubmit={e => { e.preventDefault(); if (draft.trim()) { add('task', { cat: p.id, title: draft.trim(), num1: 0, sort: Math.max(0, ...list.map(x => x.sort)) + 1 }); setDraft('') } }}>
                 <input type="text" placeholder="New task" value={draft} onChange={e => setDraft(e.target.value)} style={{ flex: 1, minWidth: 0, height: 40, fontSize: 15, padding: '0 12px', borderRadius: 12 }} />
@@ -430,22 +442,18 @@ function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onB
         })}
       </div>
       {drag?.moved && dragged && <div className="kb-card kb-ghost" style={{ position: 'fixed', left: drag.x - drag.dx, top: drag.y - drag.dy, width: drag.w }}><div style={{ fontSize: 15, fontWeight: 600 }}>{dragged.title}</div></div>}
-      <div className="muted" style={{ fontSize: 13 }}>Drag a card to move it. Tap Edit to rename or remove tasks.</div>
     </div>
   )
 }
 
-function KCard({ it, c, home, edit, faded, setEl, onDown, onMove, onUp, onCancel, onMoveTo, onRename, onRemove, onToDo }: {
+function KCard({ it, c, home, edit, faded, setEl, onDown, onRename, onRemove, onToDo }: {
   it: ProjItem; c: Col; home: Task | undefined; edit: boolean; faded: boolean; setEl: (el: HTMLDivElement | null) => void
-  onDown: (e: RPointerEvent, el: HTMLDivElement) => void; onMove: (e: RPointerEvent) => void; onUp: () => void; onCancel: () => void
-  onMoveTo: (to: Col) => void; onRename: (v: string) => void; onRemove: () => void; onToDo: () => void
+  onDown: (e: RPointerEvent, el: HTMLDivElement) => void; onRename: (v: string) => void; onRemove: () => void; onToDo: () => void
 }) {
   const el = useRef<HTMLDivElement | null>(null)
-  const stop = (e: RPointerEvent) => e.stopPropagation()
   return (
-    <div ref={x => { el.current = x; setEl(x) }} className={'kb-card' + (faded ? ' faded' : '') + (c === 'done' ? ' is-done' : '')} style={{ touchAction: edit ? 'auto' : 'none' }}
-      onPointerDown={e => { if ((e.target as HTMLElement).closest('button, input, a')) return; e.currentTarget.setPointerCapture(e.pointerId); onDown(e, el.current!) }}
-      onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel}>
+    <div ref={x => { el.current = x; setEl(x) }} className={'kb-card' + (edit ? ' editing' : '') + (faded ? ' faded' : '') + (c === 'done' ? ' is-done' : '')}
+      onPointerDown={e => { if ((e.target as HTMLElement).closest('button, input, a')) return; e.preventDefault(); onDown(e, el.current!) }}>
       {edit ? (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input type="text" aria-label="Task" defaultValue={it.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== it.title) onRename(v) }} style={{ flex: 1, minWidth: 0, height: 36, fontSize: 14 }} />
@@ -454,13 +462,10 @@ function KCard({ it, c, home, edit, faded, setEl, onDown, onMove, onUp, onCancel
       ) : (
         <>
           <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, ...(c === 'done' ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{it.title}</div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }} onPointerDown={stop}>
-            {c !== 'done' && (home && !home.done_at ? <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>On home To do</span>
-              : <button className="kb-mini" onClick={onToDo}>+ To do</button>)}
-            <span style={{ flex: 1 }} />
-            {c !== 'todo' && <button className="kb-mini" aria-label={`Move ${it.title} back`} onClick={() => onMoveTo(c === 'done' ? 'doing' : 'todo')}>‹</button>}
-            {c !== 'done' && <button className="kb-mini" aria-label={`Move ${it.title} forward`} onClick={() => onMoveTo(c === 'todo' ? 'doing' : 'done')}>›</button>}
-          </div>
+          {c !== 'done' && <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
+            {home && !home.done_at ? <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>On home To do</span>
+              : <button className="kb-mini" onClick={onToDo}>+ To do</button>}
+          </div>}
         </>
       )}
     </div>
