@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type R
 import { logError } from './lib/errorlog.ts'
 import { Face } from './Face.tsx'
 import { addDays, fmtShort, today } from './lib/dates.ts'
-import { colOf, dayIndex, daysLabel, numOf, onDay, toggleDay, WEEK, type Col } from './lib/routines.ts'
+import { dayIndex, daysLabel, DONE_STAGE, nextStageId, onDay, parseStages, stageOf, toggleDay, WEEK, type Stage } from './lib/routines.ts'
 import type { Task } from './lib/types.ts'
 import { lockRegistered, lockSupported, lockUnlock } from './lib/privateData.ts'
 import {
@@ -290,23 +290,24 @@ function WeekPlan({ items, edit, add, upsert, remove, cat, title, hint, detail }
   )
 }
 
-/** MMO: projects like the Goals tab; open one for a To do / Doing / Done board. Drag cards between columns. */
+/** MMO: projects like the Goals tab; open one for its board. Stages are editable per project (Edit). Drag cards between stages. */
 function Kanban({ items, edit, add, upsert, remove, tasks, onPush }: Ops & { tasks: Task[]; onPush: Push }) {
   const [name, setName] = useState(''); const [why, setWhy] = useState('')
   const [open, setOpen] = useState<string | null>(null)
   const projects = items.filter(x => x.kind === 'idea').sort((a, b) => a.sort - b.sort)
   const homeTask = (it: ProjItem) => (it.sub.startsWith('task:') ? tasks.find(t => t.id === it.sub.slice(5)) : undefined)
-  const col = (it: ProjItem): Col => (homeTask(it)?.done_at ? 'done' : colOf(it.num1))
+  const stageFor = (it: ProjItem, st: Stage[]) => (homeTask(it)?.done_at ? DONE_STAGE : stageOf(it.num1, st))
   const tasksOf = (id: string) => items.filter(x => x.kind === 'task' && x.cat === id)
   const p = projects.find(x => x.id === open)
-  if (p) return <Board p={p} cards={tasksOf(p.id)} col={col} homeTask={homeTask} edit={edit} add={add} upsert={upsert} remove={remove} onPush={onPush} onBack={() => setOpen(null)} />
+  if (p) return <Board p={p} cards={tasksOf(p.id)} stageFor={stageFor} homeTask={homeTask} edit={edit} add={add} upsert={upsert} remove={remove} onPush={onPush} onBack={() => setOpen(null)} />
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {projects.length === 0 && <div className="card muted" style={{ padding: 22, fontSize: 16, lineHeight: 1.5 }}>Add your first project below. Open it to get a To do / Doing / Done board, and drag tasks across as you go.</div>}
+      {projects.length === 0 && <div className="card muted" style={{ padding: 22, fontSize: 16, lineHeight: 1.5 }}>Add your first project below.</div>}
       {projects.map(pr => {
+        const st = parseStages(pr.cat)
         const cs = tasksOf(pr.id)
-        const c = { todo: cs.filter(x => col(x) === 'todo').length, doing: cs.filter(x => col(x) === 'doing').length, done: cs.filter(x => col(x) === 'done').length }
-        const pct = cs.length ? Math.round((c.done / cs.length) * 100) : 0
+        const done = cs.filter(x => stageFor(x, st) === DONE_STAGE).length
+        const pct = cs.length ? Math.round((done / cs.length) * 100) : 0
         return (
           <div key={pr.id} className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -317,7 +318,7 @@ function Kanban({ items, edit, add, upsert, remove, tasks, onPush }: Ops & { tas
                 </> : <>
                   <div style={{ fontSize: 24, fontWeight: 600 }}>{pr.title}</div>
                   {pr.sub && <div className="muted" style={{ fontSize: 15 }}>{pr.sub}</div>}
-                  <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{c.todo} to do · {c.doing} doing · {c.done} done</div>
+                  <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{st.map(s => `${cs.filter(x => stageFor(x, st) === s.id).length} ${s.name.toLowerCase()}`).join(' · ')}</div>
                 </>}
               </div>
               <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--accent)' }}>{pct}%</div>
@@ -339,21 +340,37 @@ function Kanban({ items, edit, add, upsert, remove, tasks, onPush }: Ops & { tas
   )
 }
 
-const COLS: [Col, string][] = [['todo', 'To do'], ['doing', 'Doing'], ['done', 'Done']]
-type Drag = { id: string; from: Col; x: number; y: number; dx: number; dy: number; w: number; moved: boolean; to: Col; at: number }
+type Drag = { id: string; from: number; x: number; y: number; dx: number; dy: number; w: number; moved: boolean; to: number; at: number }
 
-function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onBack }: { p: ProjItem; cards: ProjItem[]; col: (it: ProjItem) => Col; homeTask: (it: ProjItem) => Task | undefined; edit: boolean; add: Ops['add']; upsert: Ops['upsert']; remove: Ops['remove']; onPush: Push; onBack: () => void }) {
+function Board({ p, cards, stageFor, homeTask, edit, add, upsert, remove, onPush, onBack }: { p: ProjItem; cards: ProjItem[]; stageFor: (it: ProjItem, st: Stage[]) => number; homeTask: (it: ProjItem) => Task | undefined; edit: boolean; add: Ops['add']; upsert: Ops['upsert']; remove: Ops['remove']; onPush: Push; onBack: () => void }) {
+  const stages = parseStages(p.cat)
+  const first = stages[0].id
   const [draft, setDraft] = useState('')
   const [drag, setDragState] = useState<Drag | null>(null)
   const dragRef = useRef<Drag | null>(null)
   const setDrag = (d: Drag | null) => { dragRef.current = d; setDragState(d) }
-  const colEls = useRef(new Map<Col, HTMLDivElement>())
+  const boardEl = useRef<HTMLDivElement | null>(null)
+  const colEls = useRef(new Map<number, HTMLDivElement>())
   const cardEls = useRef(new Map<string, HTMLDivElement>())
-  const inCol = (c: Col) => cards.filter(x => col(x) === c).sort((a, b) => a.sort - b.sort)
-  const pct = cards.length ? Math.round((inCol('done').length / cards.length) * 100) : 0
+  const inCol = (c: number) => cards.filter(x => stageFor(x, stages) === c).sort((a, b) => a.sort - b.sort)
+  const pct = cards.length ? Math.round((inCol(DONE_STAGE).length / cards.length) * 100) : 0
 
-  const target = (x: number, y: number, id: string): { to: Col; at: number } => {
-    let to: Col = drag?.to ?? 'todo'
+  // ---- editing the stages ----
+  const saveStages = (list: Stage[]) => upsert({ ...p, cat: JSON.stringify(list) })
+  const renameStage = (id: number, name: string) => saveStages(stages.map(s => (s.id === id ? { ...s, name } : s)))
+  const moveStage = (i: number, by: number) => { const l = [...stages]; const [x] = l.splice(i, 1); l.splice(i + by, 0, x); saveStages(l) }
+  const addStage = () => { const l = [...stages]; const at = Math.max(0, l.findIndex(s => s.id === DONE_STAGE)); l.splice(at, 0, { id: nextStageId(l), name: 'New stage' }); saveStages(l) }
+  const removeStage = (s: Stage) => {
+    const left = stages.filter(x => x.id !== s.id)
+    const n = inCol(s.id).length
+    if (n && !confirm(`Remove "${s.name}"? Its ${n} ${n === 1 ? 'task moves' : 'tasks move'} to "${left[0].name}".`)) return
+    inCol(s.id).forEach(it => upsert({ ...it, num1: left[0].id }))
+    saveStages(left)
+  }
+
+  // ---- drag and drop (works with a finger on the iPad) ----
+  const target = (x: number, y: number, id: string): { to: number; at: number } => {
+    let to = dragRef.current?.to ?? first
     for (const [c, el] of colEls.current) { const r = el.getBoundingClientRect(); if (x >= r.left && x <= r.right) { to = c; break } }
     const list = inCol(to).filter(x => x.id !== id)
     let at = 0
@@ -366,13 +383,12 @@ function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onB
     list.splice(d.at, 0, moving)
     list.forEach((it, i) => {
       const f: ProjItem = { ...it, sort: i + 1 }
-      if (it.id === d.id) { f.num1 = numOf(d.to); if (d.to !== 'done' && homeTask(it)?.done_at) f.sub = '' }
+      if (it.id === d.id) { f.num1 = d.to; if (d.to !== DONE_STAGE && homeTask(it)?.done_at) f.sub = '' }
       if (f.sort !== it.sort || f.num1 !== it.num1 || f.sub !== it.sub) upsert(f)
     })
   }
-  // Drag and drop that works with a finger on the iPad: follow the finger on the whole window, and stop the page scrolling meanwhile.
   const latest = useRef({ target, drop }); latest.current = { target, drop }
-  const start = (e: RPointerEvent, it: ProjItem, c: Col, i: number, el: HTMLDivElement) => {
+  const start = (e: RPointerEvent, it: ProjItem, c: number, i: number, el: HTMLDivElement) => {
     if (edit || e.button > 0) return
     const r = el.getBoundingClientRect()
     setDrag({ id: it.id, from: c, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, moved: false, to: c, at: i })
@@ -380,17 +396,19 @@ function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onB
     const onMove = (ev: PointerEvent) => {
       const d = dragRef.current; if (!d) return
       const moved = d.moved || Math.hypot(ev.clientX - sx, ev.clientY - sy) > 6
+      // near the left or right edge, slide the board so you can reach the other stages
+      const b = boardEl.current
+      if (moved && b) { const br = b.getBoundingClientRect(); if (ev.clientX > br.right - 70) b.scrollLeft += 16; else if (ev.clientX < br.left + 70) b.scrollLeft -= 16 }
       setDrag({ ...d, x: ev.clientX, y: ev.clientY, moved, ...(moved ? latest.current.target(ev.clientX, ev.clientY, d.id) : {}) })
     }
     const noScroll = (ev: TouchEvent) => { if (dragRef.current) ev.preventDefault() }
-    const end = (drop: boolean) => () => {
+    const end = () => {
       const d = dragRef.current
-      window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel); window.removeEventListener('touchmove', noScroll)
-      if (drop && d?.moved) latest.current.drop(d)
+      window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end); window.removeEventListener('touchmove', noScroll)
+      if (d?.moved) latest.current.drop(d)
       setDrag(null)
     }
-    const up = end(true), cancel = end(true)
-    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel)
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end)
     window.addEventListener('touchmove', noScroll, { passive: false })
   }
 
@@ -408,22 +426,31 @@ function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onB
           <div className="muted" style={{ fontSize: 12, textAlign: 'right', marginTop: 2 }}>{pct}% done</div>
         </div>
       </div>
-      <div className="kanban">
-        {COLS.map(([c, label]) => {
+      <div className="kanban" ref={boardEl}>
+        {stages.map((stg, si) => {
+          const c = stg.id
           const list = inCol(c)
           const showGap = drag?.moved && drag.to === c
           // the dragged card stays in place (faded) so the iPad keeps following the finger; the dashed gap shows where it will land
           let k = 0
           const slots = list.map(it => { const isDragged = drag?.moved && it.id === drag.id; const gapBefore = !!showGap && !isDragged && k === drag!.at; if (!isDragged) k++; return { it, gapBefore } })
           const others = k
+          const tone = c === DONE_STAGE ? 'kb-done' : si === 0 ? 'kb-todo' : 'kb-doing'
           return (
-            <div key={c} ref={el => { if (el) colEls.current.set(c, el); else colEls.current.delete(c) }} className={'kb-col kb-' + c + (showGap ? ' over' : '')}>
-              <div className="kb-head"><span>{label}</span><span className="kb-count">{list.length}</span></div>
+            <div key={c} ref={el => { if (el) colEls.current.set(c, el); else colEls.current.delete(c) }} className={'kb-col ' + tone + (showGap ? ' over' : '')}>
+              {edit ? (
+                <div className="kb-head" style={{ gap: 4 }}>
+                  <input type="text" aria-label="Stage name" defaultValue={stg.name} key={stg.name} onBlur={e => { const v = e.target.value.trim(); if (v && v !== stg.name) renameStage(c, v) }} style={{ flex: 1, minWidth: 0, height: 38, fontSize: 15, fontWeight: 700 }} />
+                  <button className="kb-mini" aria-label={`Move ${stg.name} left`} disabled={si === 0} onClick={() => moveStage(si, -1)}>‹</button>
+                  <button className="kb-mini" aria-label={`Move ${stg.name} right`} disabled={si === stages.length - 1} onClick={() => moveStage(si, 1)}>›</button>
+                  {c !== DONE_STAGE && stages.length > 2 && <button className="kb-mini" aria-label={`Remove ${stg.name}`} onClick={() => removeStage(stg)}>✕</button>}
+                </div>
+              ) : <div className="kb-head"><span>{stg.name}</span><span className="kb-count">{list.length}</span></div>}
               <div className="kb-list">
                 {slots.map(({ it, gapBefore }, i) => (
                   <div key={it.id}>
                     {gapBefore && <div className="kb-gap" />}
-                    <KCard it={it} c={c} home={homeTask(it)} edit={edit} faded={drag?.id === it.id && drag.moved}
+                    <KCard it={it} done={c === DONE_STAGE} home={homeTask(it)} edit={edit} faded={drag?.id === it.id && drag.moved}
                       setEl={el => { if (el) cardEls.current.set(it.id, el); else cardEls.current.delete(it.id) }}
                       onDown={(e, el) => start(e, it, c, i, el)}
                       onRename={v => upsert({ ...it, title: v })} onRemove={() => remove(it.id)}
@@ -433,26 +460,27 @@ function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onB
                 {showGap && drag!.at >= others && <div className="kb-gap" />}
                 {list.length === 0 && !showGap && <div className="kb-empty" />}
               </div>
-              {c === 'todo' && <form style={{ display: 'flex', gap: 6, marginTop: 8 }} onSubmit={e => { e.preventDefault(); if (draft.trim()) { add('task', { cat: p.id, title: draft.trim(), num1: 0, sort: Math.max(0, ...list.map(x => x.sort)) + 1 }); setDraft('') } }}>
+              {si === 0 && <form style={{ display: 'flex', gap: 6, marginTop: 8 }} onSubmit={e => { e.preventDefault(); if (draft.trim()) { add('task', { cat: p.id, title: draft.trim(), num1: c, sort: Math.max(0, ...list.map(x => x.sort)) + 1 }); setDraft('') } }}>
                 <input type="text" placeholder="New task" value={draft} onChange={e => setDraft(e.target.value)} style={{ flex: 1, minWidth: 0, height: 40, fontSize: 15, padding: '0 12px', borderRadius: 12 }} />
                 <button className="btn small" type="submit" style={{ height: 40, fontSize: 13, padding: '0 14px' }}>Add</button>
               </form>}
             </div>
           )
         })}
+        {edit && <button className="kb-col kb-add" onClick={addStage}><span style={{ fontSize: 28, lineHeight: 1 }}>+</span><span>Add stage</span></button>}
       </div>
       {drag?.moved && dragged && <div className="kb-card kb-ghost" style={{ position: 'fixed', left: drag.x - drag.dx, top: drag.y - drag.dy, width: drag.w }}><div style={{ fontSize: 15, fontWeight: 600 }}>{dragged.title}</div></div>}
     </div>
   )
 }
 
-function KCard({ it, c, home, edit, faded, setEl, onDown, onRename, onRemove, onToDo }: {
-  it: ProjItem; c: Col; home: Task | undefined; edit: boolean; faded: boolean; setEl: (el: HTMLDivElement | null) => void
+function KCard({ it, done, home, edit, faded, setEl, onDown, onRename, onRemove, onToDo }: {
+  it: ProjItem; done: boolean; home: Task | undefined; edit: boolean; faded: boolean; setEl: (el: HTMLDivElement | null) => void
   onDown: (e: RPointerEvent, el: HTMLDivElement) => void; onRename: (v: string) => void; onRemove: () => void; onToDo: () => void
 }) {
   const el = useRef<HTMLDivElement | null>(null)
   return (
-    <div ref={x => { el.current = x; setEl(x) }} className={'kb-card' + (edit ? ' editing' : '') + (faded ? ' faded' : '') + (c === 'done' ? ' is-done' : '')}
+    <div ref={x => { el.current = x; setEl(x) }} className={'kb-card' + (edit ? ' editing' : '') + (faded ? ' faded' : '') + (done ? ' is-done' : '')}
       onPointerDown={e => { if ((e.target as HTMLElement).closest('button, input, a')) return; e.preventDefault(); onDown(e, el.current!) }}>
       {edit ? (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -461,8 +489,8 @@ function KCard({ it, c, home, edit, faded, setEl, onDown, onRename, onRemove, on
         </div>
       ) : (
         <>
-          <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, ...(c === 'done' ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{it.title}</div>
-          {c !== 'done' && <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, ...(done ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{it.title}</div>
+          {!done && <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
             {home && !home.done_at ? <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>On home To do</span>
               : <button className="kb-mini" onClick={onToDo}>+ To do</button>}
           </div>}

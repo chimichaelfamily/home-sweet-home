@@ -289,3 +289,14 @@ import { colOf, daysLabel, numOf, onDay, toggleDay } from './routines.ts'
   assert.strictEqual(colOf(0), 'todo'); assert.strictEqual(colOf(2), 'doing'); assert.strictEqual(colOf(1), 'done'); assert.strictEqual(numOf('doing'), 2)
   console.log('weekly plan tests passed')
 }
+
+import { DEFAULT_STAGES, nextStageId, parseStages, stageOf } from './routines.ts'
+{
+  assert.deepStrictEqual(parseStages(''), DEFAULT_STAGES)
+  assert.deepStrictEqual(parseStages('[{"id":0,"name":"To do"}]'), DEFAULT_STAGES) // needs Done and 2+ stages
+  const st = parseStages('[{"id":0,"name":"To do"},{"id":3,"name":"Investigate"},{"id":2,"name":"Doing"},{"id":1,"name":"Done"}]')
+  assert.strictEqual(st.length, 4); assert.strictEqual(st[1].name, 'Investigate')
+  assert.strictEqual(nextStageId(st), 4); assert.strictEqual(nextStageId(DEFAULT_STAGES), 3)
+  assert.strictEqual(stageOf(3, st), 3); assert.strictEqual(stageOf(9, st), 0)
+  console.log('board stage tests passed')
+}

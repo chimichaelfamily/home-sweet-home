@@ -40,3 +40,22 @@ export function routineStreak(steps: ProjItem[], ticks: ProjItem[], todayYmd: st
 export type Col = 'todo' | 'doing' | 'done'
 export const colOf = (num1: number): Col => (num1 === 1 ? 'done' : num1 === 2 ? 'doing' : 'todo')
 export const numOf = (c: Col) => (c === 'done' ? 1 : c === 'doing' ? 2 : 0)
+
+/** MMO board stages. Each project keeps its own list (as JSON in the project's `cat`). Task num1 = stage id.
+ *  Ids 0 (To do), 2 (Doing) and 1 (Done) match tasks made before stages were editable. Stage 1 is always "done". */
+export interface Stage { id: number; name: string }
+export const DONE_STAGE = 1
+export const DEFAULT_STAGES: Stage[] = [{ id: 0, name: 'To do' }, { id: 2, name: 'Doing' }, { id: 1, name: 'Done' }]
+export function parseStages(cat: string): Stage[] {
+  try {
+    const v = JSON.parse(cat)
+    if (Array.isArray(v)) {
+      const list = v.filter(s => s && Number.isInteger(s.id) && typeof s.name === 'string').map(s => ({ id: s.id as number, name: String(s.name) }))
+      if (list.length >= 2 && list.some(s => s.id === DONE_STAGE)) return list
+    }
+  } catch { /* not set yet */ }
+  return DEFAULT_STAGES
+}
+export const nextStageId = (list: Stage[]) => Math.max(2, ...list.map(s => s.id)) + 1
+/** Which stage a task sits in; a stage that was removed falls back to the first stage. */
+export const stageOf = (num1: number, list: Stage[]) => (list.some(s => s.id === num1) ? num1 : list[0].id)
