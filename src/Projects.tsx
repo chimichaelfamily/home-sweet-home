@@ -672,12 +672,13 @@ function ShareSetup() {
       <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {step(1, <>Tap <b>Copy link</b> above.</>)}
         {step(2, <>Open the <b>Shortcuts</b> app → <b>+</b> → name it <b>Save to job board</b>.</>)}
-        {step(3, <>Add <b>Get Contents of URL</b> and set its URL to <b>Shortcut Input</b>. (The iPad opens the ad so the board can read the title, company and pay.)</>)}
-        {step(4, <>Add <b>Base64 Encode</b>. It uses <b>Contents of URL</b> from step 3. Tap the arrow and set Line Breaks to <b>None</b>.</>)}
-        {step(5, <>Add a second <b>Get Contents of URL</b>. Paste the copied link as its URL. Tap the arrow: Method <b>POST</b>, Request Body <b>JSON</b>. Add a <b>Text</b> field named <b>shared</b> = <b>Shortcut Input</b>, and a <b>Text</b> field named <b>page</b> = <b>Base64 Encoded</b>.</>)}
-        {step(6, <>Add <b>Show Notification</b> and set it to <b>Contents of URL</b> (from step 5), so you see "Saved to the job board".</>)}
-        {step(7, <>Tap <b>ⓘ</b> (Details) → turn on <b>Show in Share Sheet</b>, and allow <b>URLs</b>, <b>Text</b> and <b>Safari web pages</b>.</>)}
-        {step(8, <>Test it: open any Seek ad → Share → <b>Save to job board</b>. The first time, tap <b>Allow</b> each time it asks.</>)}
+        {step(3, <>Add <b>Get URLs from Input</b> and set it to <b>Shortcut Input</b>. (Seek shares the ad as text with the link inside; this pulls the link out.)</>)}
+        {step(4, <>Add <b>Get Contents of URL</b> and set its URL to <b>URLs</b> (from step 3). The iPad opens the ad so the board can read the details.</>)}
+        {step(5, <>Add <b>Base64 Encode</b>. It uses <b>Contents of URL</b> from step 4. Tap the arrow and set Line Breaks to <b>None</b>.</>)}
+        {step(6, <>Add a second <b>Get Contents of URL</b>. Paste the copied link as its URL. Tap the arrow: Method <b>POST</b>, Request Body <b>JSON</b>. Add a <b>Text</b> field named <b>shared</b> = <b>Shortcut Input</b>, and a <b>Text</b> field named <b>page</b> = <b>Base64 Encoded</b>.</>)}
+        {step(7, <>Add <b>Show Notification</b> and set it to <b>Contents of URL</b> (from step 6), so you see "Saved to the job board".</>)}
+        {step(8, <>Tap <b>ⓘ</b> (Details) → turn on <b>Show in Share Sheet</b>, and allow <b>URLs</b>, <b>Text</b> and <b>Safari web pages</b>.</>)}
+        {step(9, <>Test it from a Seek ad: Share → <b>Save to job board</b> (not with the ▶ button in Shortcuts, which has no ad to send). The first time, tap <b>Allow</b> each time it asks.</>)}
       </ol>
       <div><button className="btn small outline" style={{ height: 36, fontSize: 13 }} onClick={() => { if (confirm('Make a new link? The old Share button stops working until you paste the new link into the Shortcut.')) shareKey(true).then(setKey).catch(() => setErr('Could not make a new link.')) }}>Make a new link</button></div>
     </div>

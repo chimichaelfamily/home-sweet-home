@@ -45,7 +45,7 @@ export default async function handler(req, res) {
   // what the notification on the iPad says, so it is clear what came through
   const fmt = d => { if (!d) return ''; const [y, m, dd] = d.split('-').map(Number); return `${dd} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]}` }
   const summary = (t, f) => [t + (f.company ? ` at ${f.company}` : ''), f.pay, f.work, f.place, f.deadline && `closes ${fmt(f.deadline)}`].filter(Boolean).join(' · ')
-  const hint = pageRaw.length > 1000 ? '' : '\n(Only the link came through. Update the Shortcut: Projects → Michael → Edit, steps 3–5.)'
+  const hint = pageRaw.length > 1000 ? '' : '\n(Only the link came through. Update the Shortcut: Projects → Michael → Edit, steps 3–6.)'
   // retry without the closing date if 017_job_deadline.sql has not been run yet
   const write = async (path, init, body) => {
     let r = await db(path, { ...init, body: JSON.stringify(body) })
