@@ -40,7 +40,7 @@ function MmoLocked({ onUnlock, msg }: { onUnlock: () => void; msg: string }) {
     <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 30 }}>
       <div className="card" style={{ width: 520, maxWidth: '100%', padding: 36, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ fontSize: 30, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>MMO
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>NEW YORK CITY
         </div>
         <div className="muted" style={{ fontSize: 17, lineHeight: 1.5 }}>Business ideas, goals and tasks.</div>
         {!lockSupported() && <div style={{ fontSize: 15 }}>This browser does not support Face ID passkeys. Open the app from the Home Screen icon in Safari.</div>}
@@ -95,9 +95,9 @@ function Inside({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
         </div>
         <div style={{ flex: 1 }} />
         {!(who === 'chi' && sub === 'mmo' && !mmo.unlocked) && <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>}
-        {mmo.unlocked && who === 'chi' && <button className="btn small" onClick={mmo.lock}>Lock MMO</button>}
+        {mmo.unlocked && who === 'chi' && <button className="btn small" onClick={mmo.lock}>Lock</button>}
       </div>
-      {who === 'chi' && <Pills inner value={sub} set={setSub} opts={[['skincare', 'Skincare'], ['body', 'Body'], ['diet', 'Diet'], ['mmo', 'MMO']]} />}
+      {who === 'chi' && <Pills inner value={sub} set={setSub} opts={[['skincare', 'Skincare'], ['body', 'Body'], ['diet', 'Diet'], ['mmo', 'NEW YORK CITY']]} />}
       {err && <div style={{ fontSize: 14 }}>{err} <button className="btn small outline" style={{ height: 32 }} onClick={() => setErr('')}>OK</button></div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
         {who === 'chi' && sub === 'skincare' && <><WeekPlan {...ops} cat="skin-am" title="Morning skincare" hint="e.g. Vitamin C serum" detail="Note, e.g. 2 drops" /><WeekPlan {...ops} cat="skin-pm" title="Evening skincare" hint="e.g. Retinol" detail="Note, e.g. pea-size, skip if irritated" /></>}
