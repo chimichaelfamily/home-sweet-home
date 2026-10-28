@@ -377,7 +377,7 @@ function useHabitStyle(): [HabitStyle, (v: HabitStyle) => void] {
   return [v, set]
 }
 
-/** The glowing "habits left today" bar under the weather. Tapping it opens the habits pop-up. */
+/** The soft pink "habits left today" bar under the weather. Tapping it opens the habits pop-up. */
 function HabitNudge({ s, who, onOpen }: { s: State; who: 'linh' | 'michael'; onOpen: () => void }) {
   const t = today()
   const hs = s.habits.filter(h => h.person_id === who && h.active).sort((a, b) => a.sort - b.sort)
@@ -388,7 +388,7 @@ function HabitNudge({ s, who, onOpen }: { s: State; who: 'linh' | 'michael'; onO
   const sub = all ? `${hs.length} of ${hs.length} done. Lovely.` : hs.length === 0 ? 'Add habits in Settings → Habits' : names.join(', ') + (more > 0 ? ` and ${more} more` : '')
   return (
     <button className={'habit-nudge' + (all ? ' done' : '')} onClick={onOpen} aria-label={`${PEOPLE[who]}: ${all ? 'all habits done today' : `${left.length} habits left today`}. Open habits`}>
-      <span className="hn-face">{!all && <i className="hn-ring" aria-hidden="true" />}<Face who={who} size={48} /></span>
+      <span className="hn-face"><Face who={who} size={48} /></span>
       <span className="hn-text">
         <span className="hn-title">{all ? 'All habits done today' : left.length === 1 ? '1 habit left today' : `${left.length} habits left today`}</span>
         <span className="hn-sub">{sub}</span>
@@ -960,7 +960,7 @@ function Settings({ s, apply, theme, setTheme, mode, setMode, openSec, clearOpen
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><div style={{ fontSize: 30, fontWeight: 600 }}>Habits</div><PersonToggle who={hwho} setWho={setHwho} /></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <span className="muted" style={{ fontSize: 15 }}>On the Home screen:</span>
-                {([['popup', 'Glowing bar under the weather'], ['card', 'Card under the schedule']] as const).map(([k, l]) => <button key={k} aria-pressed={habitStyle === k} onClick={() => setHabitStyle(k)} style={{ height: 44, padding: '0 18px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: '1.5px solid var(--mborder)', background: habitStyle === k ? 'var(--accent)' : 'transparent', color: habitStyle === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+                {([['popup', 'Pink bar under the weather'], ['card', 'Card under the schedule']] as const).map(([k, l]) => <button key={k} aria-pressed={habitStyle === k} onClick={() => setHabitStyle(k)} style={{ height: 44, padding: '0 18px', borderRadius: 999, fontWeight: 600, fontSize: 15, border: '1.5px solid var(--mborder)', background: habitStyle === k ? 'var(--accent)' : 'transparent', color: habitStyle === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
               </div>
               {s.habits.filter(h => h.person_id === hwho && h.active).sort((a, b) => a.sort - b.sort).map(h => (
                 <div key={h.id} style={{ display: 'flex', gap: 10 }}>
