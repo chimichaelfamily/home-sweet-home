@@ -40,6 +40,14 @@ const NAV_ICON: Partial<Record<Tab, ReactNode>> = {
   weekly: navIcon(<><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M8 16v-3M12 16V9M16 16v-5" /></>),
 }
 
+const otIcon = (d: ReactNode) => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+const OTHER_TABS: [OtherTab, string, ReactNode][] = [
+  ['knowledge', 'Knowledge', otIcon(<><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5z" /><path d="M4 19a2 2 0 012-2h13" /><path d="M9 7h6" /></>)],
+  ['ask', 'AI chat', otIcon(<><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z" /><path d="M9 11h.01M12.5 11h.01M16 11h.01" /></>)],
+  ['reminders', 'Reminders', otIcon(<><path d="M6 8a6 6 0 0112 0c0 7 3 8 3 8H3s3-1 3-8" /><path d="M10.3 20a2 2 0 003.4 0" /></>)],
+  ['products', 'Expired products', otIcon(<><path d="M9 3h6v3l2 3v11a1 1 0 01-1 1H8a1 1 0 01-1-1V9l2-3V3z" /><path d="M7 13h10" /></>)],
+]
+
 export default function App() {
   const [state, setState] = useState<State | null>(null)
   const [session, setSession] = useState<boolean>(!usingDatabase)
@@ -106,8 +114,8 @@ export default function App() {
         <div style={{ height: '100%', display: tab === 'weekly' ? 'block' : 'none' }}><Weekly s={state} /></div>
         {/* Others: Knowledge, AI chat, Reminders, Expired products. AI chat and Knowledge stay loaded so a chat or a page is not lost when switching. */}
         <div style={{ height: '100%', display: tab === 'others' ? 'flex' : 'none', flexDirection: 'column', gap: 12 }}>
-          <div className="sub-tabs" style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto', flex: 'none' }}>
-            {([['knowledge', 'Knowledge'], ['ask', 'AI chat'], ['reminders', 'Reminders'], ['products', 'Expired products']] as [OtherTab, string][]).map(([k, l]) => <button key={k} aria-pressed={other === k} onClick={() => setOther(k)} style={{ flex: 'none', whiteSpace: 'nowrap', height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: other === k ? 'var(--accent)' : 'transparent', color: other === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+          <div className="others-tabs" role="tablist" aria-label="Others">
+            {OTHER_TABS.map(([k, l, icon]) => <button key={k} role="tab" aria-selected={other === k} className={'ot ot-' + k + (other === k ? ' on' : '')} onClick={() => setOther(k)}><span className="ot-icon" aria-hidden="true">{icon}</span>{l}</button>)}
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             <div style={{ height: '100%', display: other === 'knowledge' ? 'block' : 'none' }}><Knowledge /></div>
