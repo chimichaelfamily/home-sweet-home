@@ -4,7 +4,10 @@ import type { Rule } from './rules.ts'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
-export const supabase: SupabaseClient | null = url && key ? createClient(url, key) : null
+// Stay signed in on this device: the sign-in is kept and renewed in the background, so it is only asked for once per device.
+export const supabase: SupabaseClient | null = url && key ? createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true } }) : null
+// Ask the browser to keep this app's saved data (including the sign-in) instead of clearing it to free space.
+try { navigator.storage?.persist?.().catch(() => {}) } catch { /* not supported */ }
 export const usingDatabase = !!supabase
 
 // Demo data used until the database is connected: the 13 household rules, last-done dates as you entered them.
