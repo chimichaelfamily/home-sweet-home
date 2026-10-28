@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react'
 import { logError } from './lib/errorlog.ts'
 import { Face } from './Face.tsx'
-import { fmtShort, today } from './lib/dates.ts'
+import { addDays, fmtShort, today } from './lib/dates.ts'
+import { colOf, dayIndex, daysLabel, numOf, onDay, toggleDay, WEEK, type Col } from './lib/routines.ts'
 import type { Task } from './lib/types.ts'
 import { lockRegistered, lockSupported, lockUnlock } from './lib/privateData.ts'
 import {
@@ -75,9 +76,9 @@ function Inside({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
   useEffect(() => { loadProject().then(setItems).catch(e => { logError('Projects: loading', e); setErr('Could not load. Has 015_projects.sql been run?') }) }, [])
   const upsert = (it: ProjItem) => {
     const cur = ref.current; const next = cur.some(x => x.id === it.id) ? cur.map(x => (x.id === it.id ? it : x)) : [...cur, it]
-    setItems(next); saveProject(next, { upsert: it }).catch(e => { logError('Projects: saving', e); setErr('Could not save. Has 015_projects.sql been run?') })
+    ref.current = next; setItems(next); saveProject(next, { upsert: it }).catch(e => { logError('Projects: saving', e); setErr('Could not save. Has 015_projects.sql been run?') })
   }
-  const remove = (id: string) => { const next = ref.current.filter(x => x.id !== id); setItems(next); saveProject(next, { remove: id }).catch(e => { logError('Projects: removing', e); setErr('Could not remove.') }) }
+  const remove = (id: string) => { const next = ref.current.filter(x => x.id !== id); ref.current = next; setItems(next); saveProject(next, { remove: id }).catch(e => { logError('Projects: removing', e); setErr('Could not remove.') }) }
   const add = (kind: PKind, f: Partial<ProjItem>) => {
     const same = ref.current.filter(x => x.kind === kind && x.cat === (f.cat ?? ''))
     upsert({ id: `${kind}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, owner: 'chi', kind, title: '', sub: '', cat: '', num1: 0, day: null, sort: (Math.max(0, ...same.map(x => x.sort)) + 1), ...f })
@@ -99,10 +100,10 @@ function Inside({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
       {who === 'chi' && <Pills inner value={sub} set={setSub} opts={[['skincare', 'Skincare'], ['body', 'Body'], ['diet', 'Diet'], ['mmo', 'MMO']]} />}
       {err && <div style={{ fontSize: 14 }}>{err} <button className="btn small outline" style={{ height: 32 }} onClick={() => setErr('')}>OK</button></div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
-        {who === 'chi' && sub === 'skincare' && <div className="proj-cols"><Routine {...ops} cat="skin-am" title="Morning skincare" hint="e.g. Cleanser, Vitamin C, Sunscreen" /><Routine {...ops} cat="skin-pm" title="Evening skincare" hint="e.g. Double cleanse, Retinol, Moisturiser" /></div>}
-        {who === 'chi' && sub === 'body' && <Routine {...ops} cat="body" title="Body routine" hint="e.g. 30 min walk, Pilates, Stretch" detail="When or how much, e.g. Mon/Wed/Fri" />}
+        {who === 'chi' && sub === 'skincare' && <><WeekPlan {...ops} cat="skin-am" title="Morning skincare" hint="e.g. Vitamin C serum" detail="Note, e.g. 2 drops" /><WeekPlan {...ops} cat="skin-pm" title="Evening skincare" hint="e.g. Retinol" detail="Note, e.g. pea-size, skip if irritated" /></>}
+        {who === 'chi' && sub === 'body' && <WeekPlan {...ops} cat="body" title="Body plan" hint="e.g. Upper body" detail="Exercises, e.g. push-ups, rows, plank" />}
         {who === 'chi' && sub === 'diet' && <Routine {...ops} cat="diet" title="Diet routine" hint="e.g. Protein breakfast, 2L water, No snacks after 8pm" detail="Note, e.g. 7:30am" />}
-        {who === 'chi' && sub === 'mmo' && (mmo.unlocked ? <Mmo {...ops} tasks={tasks} onPush={onPush} /> : <MmoLocked onUnlock={mmo.unlock} msg={mmo.msg} />)}
+        {who === 'chi' && sub === 'mmo' && (mmo.unlocked ? <Kanban {...ops} tasks={tasks} onPush={onPush} /> : <MmoLocked onUnlock={mmo.unlock} msg={mmo.msg} />)}
         {who === 'michael' && <JobBoard edit={edit} />}
       </div>
     </div>
@@ -164,76 +165,257 @@ function Routine({ items, edit, add, upsert, remove, cat, title, hint, detail = 
   )
 }
 
-function Mmo({ items, edit, add, upsert, remove, tasks, onPush }: Ops & { tasks: Task[]; onPush: Push }) {
-  const [idea, setIdea] = useState(''); const [why, setWhy] = useState('')
+/** Skincare / body plan: each step chooses its days; Monday-to-Sunday columns; tick today's column. */
+function WeekPlan({ items, edit, add, upsert, remove, cat, title, hint, detail }: Ops & { cat: string; title: string; hint: string; detail: string }) {
+  const t = today()
+  const ti = dayIndex(t)
+  const mon = addDays(t, -ti)
+  const week = WEEK.map((d, i) => ({ d, i, ymd: addDays(mon, i) }))
+  const [name, setName] = useState(''); const [note, setNote] = useState(''); const [mask, setMask] = useState(127)
+  const steps = items.filter(x => x.kind === 'step' && x.cat === cat).sort((a, b) => a.sort - b.sort)
+  const ticks = items.filter(x => x.kind === 'tick' && x.cat === cat)
+  const done = (s: ProjItem, ymd: string) => ticks.some(x => x.title === s.id && x.day === ymd)
+  const toggle = (s: ProjItem) => { const id = tickId(s.id, t); if (done(s, t)) remove(id); else upsert({ id, owner: 'chi', kind: 'tick', title: s.id, sub: '', cat, num1: 1, day: t, sort: 0 }) }
+  const todays = steps.filter(s => onDay(s, t))
+  const n = todays.filter(s => done(s, t)).length
+  const streak = routineStreak(steps, ticks, t)
+  const cell = 58
+  return (
+    <div className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>{title}</div>
+          <div className="muted" style={{ fontSize: 14 }}>{!steps.length ? 'No steps yet' : todays.length ? `Today: ${n} of ${todays.length} done` : 'Nothing planned today'}</div>
+        </div>
+        {streak > 0 && <div style={{ textAlign: 'right' }}><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>{streak}</div><div className="muted" style={{ fontSize: 12, fontWeight: 600 }}>day streak</div></div>}
+      </div>
+      {steps.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="week-plan" style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: 640 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left' }}><span className="muted" style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2 }}>STEP</span></th>
+                {week.map(w => <th key={w.d} className={w.i === ti ? 'today' : ''} style={{ width: cell }}><div style={{ fontSize: 13, fontWeight: 700 }}>{w.i === ti ? 'Today' : w.d}</div><div className="muted" style={{ fontSize: 11 }}>{fmtShort(w.ymd)}</div></th>)}
+                {edit && <th style={{ width: 90 }} />}
+              </tr>
+            </thead>
+            <tbody>
+              {steps.map(s => (
+                <tr key={s.id}>
+                  <td>
+                    {edit ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <input type="text" aria-label="Step" defaultValue={s.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== s.title) upsert({ ...s, title: v }) }} style={{ height: 36, fontSize: 15 }} />
+                        <input type="text" aria-label="Note" placeholder="Note" defaultValue={s.sub} onBlur={e => { const v = e.target.value.trim(); if (v !== s.sub) upsert({ ...s, sub: v }) }} style={{ height: 32, fontSize: 13 }} />
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 16, fontWeight: 600 }}>{s.title}</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{[daysLabel(s.num1), s.sub].filter(Boolean).join(' · ')}</div>
+                      </>
+                    )}
+                  </td>
+                  {week.map(w => {
+                    const planned = onDay(s, w.ymd)
+                    if (edit) return <td key={w.d} className={w.i === ti ? 'today' : ''}><button className={'wp-day' + (planned ? ' on' : '')} aria-pressed={planned} aria-label={`${s.title} on ${w.d}`} onClick={() => upsert({ ...s, num1: toggleDay(s.num1, w.i) })}>{planned ? '✓' : ''}</button></td>
+                    if (!planned) return <td key={w.d} className={w.i === ti ? 'today' : ''}><span className="wp-off" aria-label="Not planned">–</span></td>
+                    if (w.i === ti) return <td key={w.d} className="today"><Tick on={done(s, t)} label={done(s, t) ? `Untick ${s.title}` : `Tick ${s.title}`} onClick={() => toggle(s)} /></td>
+                    const past = w.i < ti, got = done(s, w.ymd)
+                    return <td key={w.d}><span className={'wp-dot' + (got ? ' got' : past ? ' missed' : '')} aria-label={got ? 'Done' : past ? 'Missed' : 'Planned'} /></td>
+                  })}
+                  {edit && <td><RM label={`Remove ${s.title}`} onClick={() => { ticks.filter(x => x.title === s.id).forEach(x => remove(x.id)); remove(s.id) }} /></td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!edit && <div className="muted" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, marginTop: 8, alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span className="wp-dot got" /> done</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span className="wp-dot missed" /> missed</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span className="wp-dot" /> coming up</span>
+            <span>– not that day</span>
+            <span>Tap Edit to change which days.</span>
+          </div>}
+        </div>
+      )}
+      {(edit || steps.length === 0) && (
+        <form style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }} onSubmit={e => { e.preventDefault(); if (name.trim()) { add('step', { cat, title: name.trim(), sub: note.trim(), num1: mask === 127 ? 0 : mask }); setName(''); setNote(''); setMask(127) } }}>
+          <input type="text" placeholder={hint} value={name} onChange={e => setName(e.target.value)} style={{ flex: '2 1 200px', minWidth: 0, height: 44 }} />
+          <input type="text" placeholder={detail} value={note} onChange={e => setNote(e.target.value)} style={{ flex: '2 1 200px', minWidth: 0, height: 44 }} />
+          <div role="group" aria-label="Days" style={{ display: 'flex', gap: 4 }}>
+            {WEEK.map((d, i) => <button type="button" key={d} className={'wp-day' + (mask & (1 << i) ? ' on' : '')} aria-pressed={!!(mask & (1 << i))} onClick={() => setMask(m => (m ^ (1 << i)) || 127)} style={{ width: 44 }}>{d.slice(0, 2)}</button>)}
+          </div>
+          <button className="btn small" type="submit">Add step</button>
+        </form>
+      )}
+    </div>
+  )
+}
+
+/** MMO: projects like the Goals tab; open one for a To do / Doing / Done board. Drag cards between columns. */
+function Kanban({ items, edit, add, upsert, remove, tasks, onPush }: Ops & { tasks: Task[]; onPush: Push }) {
+  const [name, setName] = useState(''); const [why, setWhy] = useState('')
   const [open, setOpen] = useState<string | null>(null)
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const ideas = items.filter(x => x.kind === 'idea').sort((a, b) => a.sort - b.sort)
+  const projects = items.filter(x => x.kind === 'idea').sort((a, b) => a.sort - b.sort)
   const homeTask = (it: ProjItem) => (it.sub.startsWith('task:') ? tasks.find(t => t.id === it.sub.slice(5)) : undefined)
-  const isDone = (it: ProjItem) => it.num1 === 1 || !!homeTask(it)?.done_at
+  const col = (it: ProjItem): Col => (homeTask(it)?.done_at ? 'done' : colOf(it.num1))
+  const tasksOf = (id: string) => items.filter(x => x.kind === 'task' && x.cat === id)
+  const p = projects.find(x => x.id === open)
+  if (p) return <Board p={p} cards={tasksOf(p.id)} col={col} homeTask={homeTask} edit={edit} add={add} upsert={upsert} remove={remove} onPush={onPush} onBack={() => setOpen(null)} />
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {ideas.length === 0 && <div className="card muted" style={{ padding: 22, fontSize: 16, lineHeight: 1.5 }}>Add your first business idea below. Each idea gets its own goals (what success looks like) and tasks (the next things to do). Tap "+ To do" on a task to put it on the home To do list.</div>}
-      {ideas.map(i => {
-        const goals = items.filter(x => x.kind === 'goal' && x.cat === i.id).sort((a, b) => a.sort - b.sort)
-        const tks = items.filter(x => x.kind === 'task' && x.cat === i.id).sort((a, b) => a.sort - b.sort)
-        const all = [...goals, ...tks]; const done = all.filter(isDone).length
-        const pct = all.length ? Math.round((done / all.length) * 100) : 0
-        const isOpen = open === i.id || edit
-        const row = (it: ProjItem) => {
-          const d = isDone(it); const ht = homeTask(it)
-          return (
-            <div key={it.id} className="row" style={{ minHeight: 44, gap: 10 }}>
-              <Tick size={24} on={d} label={d ? `Mark ${it.title} not done` : `Mark ${it.title} done`} onClick={() => upsert({ ...it, num1: d ? 0 : 1 })} />
-              {edit ? <input type="text" aria-label="Name" defaultValue={it.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== it.title) upsert({ ...it, title: v }) }} style={{ flex: 1, minWidth: 0, height: 38 }} />
-                : <div style={{ flex: 1, fontSize: 16, ...(d ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{it.title}</div>}
-              {!edit && it.kind === 'task' && !d && (ht && !ht.done_at ? <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>In To do</span>
-                : <button className="btn small outline" style={{ height: 30, fontSize: 12, padding: '0 10px' }} onClick={() => { const id = onPush(it.title); upsert({ ...it, sub: 'task:' + id }) }}>+ To do</button>)}
-              {edit && <RM label={`Remove ${it.title}`} onClick={() => remove(it.id)} />}
-            </div>
-          )
-        }
-        const adder = (kind: 'goal' | 'task', ph: string) => {
-          const k = `${i.id}:${kind}`; const v = drafts[k] ?? ''
-          return (
-            <form style={{ display: 'flex', gap: 6, marginTop: 6 }} onSubmit={e => { e.preventDefault(); if (v.trim()) { add(kind, { cat: i.id, title: v.trim() }); setDrafts({ ...drafts, [k]: '' }) } }}>
-              <input type="text" placeholder={ph} value={v} onChange={e => setDrafts({ ...drafts, [k]: e.target.value })} style={{ flex: 1, minWidth: 0, height: 38, fontSize: 15, padding: '0 12px', borderRadius: 12 }} />
-              <button className="btn small" type="submit" style={{ height: 38, fontSize: 13, padding: '0 14px' }}>Add</button>
-            </form>
-          )
-        }
+      {projects.length === 0 && <div className="card muted" style={{ padding: 22, fontSize: 16, lineHeight: 1.5 }}>Add your first project below. Open it to get a To do / Doing / Done board, and drag tasks across as you go.</div>}
+      {projects.map(pr => {
+        const cs = tasksOf(pr.id)
+        const c = { todo: cs.filter(x => col(x) === 'todo').length, doing: cs.filter(x => col(x) === 'doing').length, done: cs.filter(x => col(x) === 'done').length }
+        const pct = cs.length ? Math.round((c.done / cs.length) * 100) : 0
         return (
-          <div key={i.id} className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: edit ? 'default' : 'pointer' }} onClick={() => { if (!edit) setOpen(isOpen ? null : i.id) }}>
+          <div key={pr.id} className="card" style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {edit ? <>
-                  <input type="text" aria-label="Idea name" defaultValue={i.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== i.title) upsert({ ...i, title: v }) }} style={{ width: '100%', marginBottom: 6 }} />
-                  <input type="text" aria-label="Idea description" placeholder="One line about the idea" defaultValue={i.sub} onBlur={e => { const v = e.target.value.trim(); if (v !== i.sub) upsert({ ...i, sub: v }) }} style={{ width: '100%' }} />
+                  <input type="text" aria-label="Project name" defaultValue={pr.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== pr.title) upsert({ ...pr, title: v }) }} style={{ width: '100%', marginBottom: 6 }} />
+                  <input type="text" aria-label="Project description" placeholder="One line about it" defaultValue={pr.sub} onBlur={e => { const v = e.target.value.trim(); if (v !== pr.sub) upsert({ ...pr, sub: v }) }} style={{ width: '100%' }} />
                 </> : <>
-                  <div style={{ fontSize: 24, fontWeight: 600 }}>{i.title}</div>
-                  {i.sub && <div className="muted" style={{ fontSize: 15 }}>{i.sub}</div>}
+                  <div style={{ fontSize: 24, fontWeight: 600 }}>{pr.title}</div>
+                  {pr.sub && <div className="muted" style={{ fontSize: 15 }}>{pr.sub}</div>}
+                  <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{c.todo} to do · {c.doing} doing · {c.done} done</div>
                 </>}
-                {!edit && <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{goals.length} {goals.length === 1 ? 'goal' : 'goals'} · {tks.filter(x => !isDone(x)).length} to do</div>}
               </div>
               <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--accent)' }}>{pct}%</div>
             </div>
             <div style={{ height: 10, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 10, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
-            {isOpen && (
-              <div className="proj-cols" style={{ marginTop: 4 }}>
-                <div><div className="muted" style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5 }}>GOALS</div>{goals.map(row)}{adder('goal', 'A goal, e.g. First 10 paying clients')}</div>
-                <div><div className="muted" style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5 }}>TASKS</div>{tks.filter(x => !isDone(x)).map(row)}{tks.filter(isDone).map(row)}{adder('task', 'A task, e.g. Register ABN')}</div>
-              </div>
-            )}
-            {!isOpen && <button onClick={() => setOpen(i.id)} style={{ alignSelf: 'flex-end', border: 'none', background: 'none', padding: 0, fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Open</button>}
-            {edit && <div><RM label={`Remove ${i.title}`} onClick={() => { if (confirm(`Remove "${i.title}" with its goals and tasks?`)) { all.forEach(x => remove(x.id)); remove(i.id) } }} /></div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              {edit && <RM label={`Remove ${pr.title}`} onClick={() => { if (confirm(`Remove "${pr.title}" and all its tasks?`)) { items.filter(x => x.cat === pr.id).forEach(x => remove(x.id)); remove(pr.id) } }} />}
+              {!edit && <button className="btn small" onClick={() => setOpen(pr.id)}>Open board</button>}
+            </div>
           </div>
         )
       })}
-      <form className="card" style={{ display: 'flex', gap: 8, padding: 16, flexWrap: 'wrap' }} onSubmit={e => { e.preventDefault(); if (idea.trim()) { add('idea', { title: idea.trim(), sub: why.trim() }); setIdea(''); setWhy('') } }}>
-        <input type="text" placeholder="New business idea" value={idea} onChange={e => setIdea(e.target.value)} style={{ flex: '1 1 200px', minWidth: 0 }} />
+      <form className="card" style={{ display: 'flex', gap: 8, padding: 16, flexWrap: 'wrap' }} onSubmit={e => { e.preventDefault(); if (name.trim()) { add('idea', { title: name.trim(), sub: why.trim() }); setName(''); setWhy('') } }}>
+        <input type="text" placeholder="New project" value={name} onChange={e => setName(e.target.value)} style={{ flex: '1 1 200px', minWidth: 0 }} />
         <input type="text" placeholder="One line about it (optional)" value={why} onChange={e => setWhy(e.target.value)} style={{ flex: '2 1 260px', minWidth: 0 }} />
-        <button className="btn small" type="submit">Add idea</button>
+        <button className="btn small" type="submit">Add project</button>
       </form>
+    </div>
+  )
+}
+
+const COLS: [Col, string][] = [['todo', 'To do'], ['doing', 'Doing'], ['done', 'Done']]
+type Drag = { id: string; from: Col; x: number; y: number; dx: number; dy: number; w: number; moved: boolean; to: Col; at: number }
+
+function Board({ p, cards, col, homeTask, edit, add, upsert, remove, onPush, onBack }: { p: ProjItem; cards: ProjItem[]; col: (it: ProjItem) => Col; homeTask: (it: ProjItem) => Task | undefined; edit: boolean; add: Ops['add']; upsert: Ops['upsert']; remove: Ops['remove']; onPush: Push; onBack: () => void }) {
+  const [draft, setDraft] = useState('')
+  const [drag, setDrag] = useState<Drag | null>(null)
+  const colEls = useRef(new Map<Col, HTMLDivElement>())
+  const cardEls = useRef(new Map<string, HTMLDivElement>())
+  const inCol = (c: Col) => cards.filter(x => col(x) === c).sort((a, b) => a.sort - b.sort)
+  const pct = cards.length ? Math.round((inCol('done').length / cards.length) * 100) : 0
+
+  const target = (x: number, y: number, id: string): { to: Col; at: number } => {
+    let to: Col = drag?.to ?? 'todo'
+    for (const [c, el] of colEls.current) { const r = el.getBoundingClientRect(); if (x >= r.left && x <= r.right) { to = c; break } }
+    const list = inCol(to).filter(x => x.id !== id)
+    let at = 0
+    for (const it of list) { const el = cardEls.current.get(it.id); if (el) { const r = el.getBoundingClientRect(); if (y > r.top + r.height / 2) at++ } }
+    return { to, at }
+  }
+  const drop = (d: Drag) => {
+    const moving = cards.find(x => x.id === d.id); if (!moving) return
+    const list = inCol(d.to).filter(x => x.id !== d.id)
+    list.splice(d.at, 0, moving)
+    list.forEach((it, i) => {
+      const f: ProjItem = { ...it, sort: i + 1 }
+      if (it.id === d.id) { f.num1 = numOf(d.to); if (d.to !== 'done' && homeTask(it)?.done_at) f.sub = '' }
+      if (f.sort !== it.sort || f.num1 !== it.num1 || f.sub !== it.sub) upsert(f)
+    })
+  }
+  const move = (it: ProjItem, to: Col) => upsert({ ...it, num1: numOf(to), sort: Math.max(0, ...inCol(to).map(x => x.sort)) + 1, ...(to !== 'done' && homeTask(it)?.done_at ? { sub: '' } : {}) })
+
+  const dragged = drag && cards.find(x => x.id === drag.id)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <button className="btn small outline" onClick={onBack}>‹ All projects</button>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ fontSize: 24, fontWeight: 600 }}>{p.title}</div>
+          {p.sub && <div className="muted" style={{ fontSize: 14 }}>{p.sub}</div>}
+        </div>
+        <div style={{ width: 160 }}>
+          <div style={{ height: 10, borderRadius: 10, background: 'var(--faint)' }}><div style={{ height: 10, borderRadius: 10, width: `${pct}%`, background: 'var(--accent)' }} /></div>
+          <div className="muted" style={{ fontSize: 12, textAlign: 'right', marginTop: 2 }}>{pct}% done</div>
+        </div>
+      </div>
+      <div className="kanban">
+        {COLS.map(([c, label]) => {
+          const list = inCol(c)
+          const showGap = drag?.moved && drag.to === c
+          // the dragged card stays in place (faded) so the iPad keeps following the finger; the dashed gap shows where it will land
+          let k = 0
+          const slots = list.map(it => { const isDragged = drag?.moved && it.id === drag.id; const gapBefore = !!showGap && !isDragged && k === drag!.at; if (!isDragged) k++; return { it, gapBefore } })
+          const others = k
+          return (
+            <div key={c} ref={el => { if (el) colEls.current.set(c, el); else colEls.current.delete(c) }} className={'kb-col kb-' + c + (showGap ? ' over' : '')}>
+              <div className="kb-head"><span>{label}</span><span className="kb-count">{list.length}</span></div>
+              <div className="kb-list">
+                {slots.map(({ it, gapBefore }, i) => (
+                  <div key={it.id}>
+                    {gapBefore && <div className="kb-gap" />}
+                    <KCard it={it} c={c} home={homeTask(it)} edit={edit} faded={drag?.id === it.id && drag.moved}
+                      setEl={el => { if (el) cardEls.current.set(it.id, el); else cardEls.current.delete(it.id) }}
+                      onDown={(e, el) => { if (edit) return; const r = el.getBoundingClientRect(); setDrag({ id: it.id, from: c, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, moved: false, to: c, at: i }) }}
+                      onMove={e => { if (!drag || drag.id !== it.id) return; const moved = drag.moved || Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8; setDrag({ ...drag, x: e.clientX, y: e.clientY, moved, ...(moved ? target(e.clientX, e.clientY, it.id) : {}) }) }}
+                      onUp={() => { if (drag?.moved) drop(drag); setDrag(null) }}
+                      onCancel={() => setDrag(null)}
+                      onMoveTo={to => move(it, to)}
+                      onRename={v => upsert({ ...it, title: v })} onRemove={() => remove(it.id)}
+                      onToDo={() => { const id = onPush(it.title); upsert({ ...it, sub: 'task:' + id }) }} />
+                  </div>
+                ))}
+                {showGap && drag!.at >= others && <div className="kb-gap" />}
+                {list.length === 0 && !showGap && <div className="kb-empty">{c === 'todo' ? 'Add a task below' : c === 'doing' ? 'Drag a task here when you start it' : 'Finished tasks land here'}</div>}
+              </div>
+              {c === 'todo' && <form style={{ display: 'flex', gap: 6, marginTop: 8 }} onSubmit={e => { e.preventDefault(); if (draft.trim()) { add('task', { cat: p.id, title: draft.trim(), num1: 0, sort: Math.max(0, ...list.map(x => x.sort)) + 1 }); setDraft('') } }}>
+                <input type="text" placeholder="New task" value={draft} onChange={e => setDraft(e.target.value)} style={{ flex: 1, minWidth: 0, height: 40, fontSize: 15, padding: '0 12px', borderRadius: 12 }} />
+                <button className="btn small" type="submit" style={{ height: 40, fontSize: 13, padding: '0 14px' }}>Add</button>
+              </form>}
+            </div>
+          )
+        })}
+      </div>
+      {drag?.moved && dragged && <div className="kb-card kb-ghost" style={{ position: 'fixed', left: drag.x - drag.dx, top: drag.y - drag.dy, width: drag.w }}><div style={{ fontSize: 15, fontWeight: 600 }}>{dragged.title}</div></div>}
+      <div className="muted" style={{ fontSize: 13 }}>Drag a card to move it. Tap Edit to rename or remove tasks.</div>
+    </div>
+  )
+}
+
+function KCard({ it, c, home, edit, faded, setEl, onDown, onMove, onUp, onCancel, onMoveTo, onRename, onRemove, onToDo }: {
+  it: ProjItem; c: Col; home: Task | undefined; edit: boolean; faded: boolean; setEl: (el: HTMLDivElement | null) => void
+  onDown: (e: RPointerEvent, el: HTMLDivElement) => void; onMove: (e: RPointerEvent) => void; onUp: () => void; onCancel: () => void
+  onMoveTo: (to: Col) => void; onRename: (v: string) => void; onRemove: () => void; onToDo: () => void
+}) {
+  const el = useRef<HTMLDivElement | null>(null)
+  const stop = (e: RPointerEvent) => e.stopPropagation()
+  return (
+    <div ref={x => { el.current = x; setEl(x) }} className={'kb-card' + (faded ? ' faded' : '') + (c === 'done' ? ' is-done' : '')} style={{ touchAction: edit ? 'auto' : 'none' }}
+      onPointerDown={e => { if ((e.target as HTMLElement).closest('button, input, a')) return; e.currentTarget.setPointerCapture(e.pointerId); onDown(e, el.current!) }}
+      onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel}>
+      {edit ? (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="text" aria-label="Task" defaultValue={it.title} onBlur={e => { const v = e.target.value.trim(); if (v && v !== it.title) onRename(v) }} style={{ flex: 1, minWidth: 0, height: 36, fontSize: 14 }} />
+          <RM label={`Remove ${it.title}`} onClick={onRemove} />
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3, ...(c === 'done' ? { textDecoration: 'line-through', color: 'var(--muted)' } : {}) }}>{it.title}</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }} onPointerDown={stop}>
+            {c !== 'done' && (home && !home.done_at ? <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>On home To do</span>
+              : <button className="kb-mini" onClick={onToDo}>+ To do</button>)}
+            <span style={{ flex: 1 }} />
+            {c !== 'todo' && <button className="kb-mini" aria-label={`Move ${it.title} back`} onClick={() => onMoveTo(c === 'done' ? 'doing' : 'todo')}>‹</button>}
+            {c !== 'done' && <button className="kb-mini" aria-label={`Move ${it.title} forward`} onClick={() => onMoveTo(c === 'todo' ? 'doing' : 'done')}>›</button>}
+          </div>
+        </>
+      )}
     </div>
   )
 }

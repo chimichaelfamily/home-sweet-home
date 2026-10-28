@@ -271,3 +271,21 @@ import { decodePage, linkKey, parsePage, parseShared, siteOf, splitTitle } from 
   assert.strictEqual(decodePage('plain text here'), 'plain text here')
   console.log('job page tests passed')
 }
+
+import { colOf, daysLabel, numOf, onDay, toggleDay } from './routines.ts'
+{
+  const mk = (id: string, num1: number) => ({ id, owner: 'chi' as const, kind: 'step' as const, title: id, sub: '', cat: 'skin-pm', num1, day: null, sort: 0 })
+  const tk = (s: string, day: string) => ({ id: `tick-${s}-${day}`, owner: 'chi' as const, kind: 'tick' as const, title: s, sub: '', cat: 'skin-pm', num1: 1, day, sort: 0 })
+  const retinol = mk('ret', 1 | 4 | 16) // Mon Wed Fri
+  const acid = mk('acid', 2 | 8 | 32) // Tue Thu Sat
+  assert.ok(onDay(retinol, '2026-10-28')); assert.ok(!onDay(acid, '2026-10-28')) // Wed
+  assert.ok(onDay(mk('x', 0), '2026-11-01')) // 0 = every day
+  assert.strictEqual(daysLabel(retinol.num1), 'Mon, Wed, Fri'); assert.strictEqual(daysLabel(0), 'Every day'); assert.strictEqual(daysLabel(31), 'Weekdays')
+  assert.strictEqual(toggleDay(0, 6), 63); assert.strictEqual(toggleDay(1, 0), 0)
+  // Mon 26 retinol, Tue 27 acid done; Sun 25 nothing planned (skipped); today Wed not yet done
+  const ticks = [tk('ret', '2026-10-26'), tk('acid', '2026-10-27'), tk('acid', '2026-10-24'), tk('ret', '2026-10-23')]
+  assert.strictEqual(routineStreak([retinol, acid], ticks, '2026-10-28'), 4)
+  assert.strictEqual(routineStreak([retinol, acid], [...ticks, tk('ret', '2026-10-28')], '2026-10-28'), 5)
+  assert.strictEqual(colOf(0), 'todo'); assert.strictEqual(colOf(2), 'doing'); assert.strictEqual(colOf(1), 'done'); assert.strictEqual(numOf('doing'), 2)
+  console.log('weekly plan tests passed')
+}
