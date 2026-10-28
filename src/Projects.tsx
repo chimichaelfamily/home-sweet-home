@@ -40,9 +40,10 @@ export function Projects({ tasks, onPush }: { tasks: Task[]; onPush: Push }) {
   )
 }
 
-const Pills = <K extends string>({ value, set, opts, size = 40 }: { value: K; set: (k: K) => void; opts: [K, string][]; size?: number }) => (
-  <div className="sub-tabs" style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999 }}>
-    {opts.map(([k, l]) => <button key={k} onClick={() => set(k)} style={{ height: size, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: value === k ? 'var(--accent)' : 'transparent', color: value === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+/** Tab row, same as the other tabs: main tabs use the theme colour; the smaller tabs inside a section (inner) are blue. */
+const Pills = <K extends string>({ value, set, opts, inner = false }: { value: K; set: (k: K) => void; opts: [K, string][]; inner?: boolean }) => (
+  <div className={'sub-tabs' + (inner ? ' seg-inner' : '')} style={{ display: 'flex', gap: 4, padding: 4, background: inner ? undefined : 'var(--ground)', borderRadius: 999, overflowX: 'auto', maxWidth: '100%' }}>
+    {opts.map(([k, l]) => <button key={k} className={inner && value === k ? 'on' : undefined} aria-pressed={value === k} onClick={() => set(k)} style={inner ? undefined : { flex: 'none', whiteSpace: 'nowrap', height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: value === k ? 'var(--accent)' : 'transparent', color: value === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
   </div>
 )
 const Tick = ({ on, label, onClick, size = 30 }: { on: boolean; label: string; onClick: () => void; size?: number }) => (
@@ -76,11 +77,11 @@ function Inside({ onLock, tasks, onPush }: { onLock: () => void; tasks: Task[]; 
       <div className="mc-head" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 36, fontWeight: 600 }}>Projects</div>
         <Pills value={who} set={setWho} opts={[['chi', 'Chi'], ['michael', 'Michael']]} />
-        {who === 'chi' && <Pills value={sub} set={setSub} size={36} opts={[['skincare', 'Skincare'], ['body', 'Body'], ['diet', 'Diet'], ['mmo', 'MMO']]} />}
         <div style={{ flex: 1 }} />
         <button className="btn small outline" onClick={() => setEdit(!edit)}>{edit ? 'Done editing' : 'Edit'}</button>
         <button className="btn small" onClick={onLock}>Lock</button>
       </div>
+      {who === 'chi' && <Pills inner value={sub} set={setSub} opts={[['skincare', 'Skincare'], ['body', 'Body'], ['diet', 'Diet'], ['mmo', 'MMO']]} />}
       {err && <div style={{ fontSize: 14 }}>{err} <button className="btn small outline" style={{ height: 32 }} onClick={() => setErr('')}>OK</button></div>}
       <div className="scroll" style={{ flex: 1, minHeight: 0 }}>
         {who === 'chi' && sub === 'skincare' && <div className="proj-cols"><Routine {...ops} cat="skin-am" title="Morning skincare" hint="e.g. Cleanser, Vitamin C, Sunscreen" /><Routine {...ops} cat="skin-pm" title="Evening skincare" hint="e.g. Double cleanse, Retinol, Moisturiser" /></div>}
@@ -272,7 +273,7 @@ function JobBoard({ edit }: { edit: boolean }) {
           <div className="muted" style={{ fontSize: 14 }}>{ranText}</div>
           {ran?.note && <div style={{ fontSize: 13, color: 'var(--late)' }}>{ran.note}</div>}
         </div>
-        <Pills value={view} set={setView} size={38} opts={[['new', `New ${count('new') || ''}`.trim()], ['saved', `Saved ${count('saved') || ''}`.trim()], ['applied', `Applied ${count('applied') || ''}`.trim()]]} />
+        <Pills inner value={view} set={setView} opts={[['new', `New ${count('new') || ''}`.trim()], ['saved', `Saved ${count('saved') || ''}`.trim()], ['applied', `Applied ${count('applied') || ''}`.trim()]]} />
         <button className="btn small outline" disabled={busy} onClick={refresh}>{busy ? 'Checking…' : 'Check now'}</button>
       </div>
       {msg && <div style={{ fontSize: 14 }}>{msg}</div>}
