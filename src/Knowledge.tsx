@@ -19,10 +19,11 @@ function useToday() {
 }
 const ask = (prompt: string, system?: string) => askAI([{ role: 'user', text: prompt }], system)
 
-function Seg<T extends string>({ options, value, onChange }: { options: [T, string][]; value: T; onChange: (v: T) => void }) {
+/** Tab row. The main Knowledge tabs use the theme colour; the smaller tabs inside each section (inner) use blue so they stand apart. */
+function Seg<T extends string>({ options, value, onChange, inner = false }: { options: [T, string][]; value: T; onChange: (v: T) => void; inner?: boolean }) {
   return (
-    <div className="sub-tabs" style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--ground)', borderRadius: 999, overflowX: 'auto', maxWidth: '100%' }}>
-      {options.map(([k, l]) => <button key={k} onClick={() => onChange(k)} aria-pressed={value === k} style={{ flex: 'none', whiteSpace: 'nowrap', height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: value === k ? 'var(--accent)' : 'transparent', color: value === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
+    <div className={'sub-tabs' + (inner ? ' seg-inner' : '')} style={{ display: 'flex', gap: 4, padding: 4, background: inner ? undefined : 'var(--ground)', borderRadius: 999, overflowX: 'auto', maxWidth: '100%' }}>
+      {options.map(([k, l]) => <button key={k} className={inner && value === k ? 'on' : undefined} onClick={() => onChange(k)} aria-pressed={value === k} style={inner ? undefined : { flex: 'none', whiteSpace: 'nowrap', height: 40, padding: '0 18px', borderRadius: 999, border: 'none', fontWeight: 600, fontSize: 15, background: value === k ? 'var(--accent)' : 'transparent', color: value === k ? 'var(--on-accent)' : 'var(--ink)' }}>{l}</button>)}
     </div>
   )
 }
@@ -106,7 +107,7 @@ function Books({ books, upsert, remove, make }: { books: KItem[] } & Ops) {
   const cur = books.find(b => b.id === open)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Seg options={STATUSES.map(([k, l]) => [k, `${l} (${books.filter(b => (b.cat || 'want') === k).length})`] as [string, string])} value={tab} onChange={setTab} />
+      <Seg inner options={STATUSES.map(([k, l]) => [k, `${l} (${books.filter(b => (b.cat || 'want') === k).length})`] as [string, string])} value={tab} onChange={setTab} />
       <div className="card" style={{ padding: '6px 22px' }}>
         {list.length === 0 && <div className="muted" style={{ padding: '18px 0', fontSize: 16 }}>Nothing here yet. Add a book below.</div>}
         {list.map(b => (
@@ -144,7 +145,7 @@ function BookDialog({ book, onSave, onDelete, onClose }: { book: KItem; onSave: 
     <div className="overlay" onClick={onClose}><div className="dialog" style={{ width: 640, maxHeight: '92dvh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
       <input type="text" aria-label="Title" value={d.title} onChange={e => setD({ ...d, title: e.target.value })} style={{ fontSize: 24, fontWeight: 600 }} />
       <input type="text" aria-label="Author" placeholder="Author" value={d.sub} onChange={e => setD({ ...d, sub: e.target.value })} />
-      <Seg options={STATUSES} value={d.cat} onChange={v => setD({ ...d, cat: v, num: v === 'done' ? 100 : d.num })} />
+      <Seg inner options={STATUSES} value={d.cat} onChange={v => setD({ ...d, cat: v, num: v === 'done' ? 100 : d.num })} />
       {d.cat === 'reading' && <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>Progress<input type="range" min={0} max={100} value={d.num} onChange={e => setD({ ...d, num: Number(e.target.value) })} style={{ flex: 1 }} /><b style={{ width: 44 }}>{Math.round(d.num)}%</b></label>}
       {d.cat === 'done' && <div style={{ display: 'flex', gap: 6 }} aria-label="Rating">{[1, 2, 3, 4, 5].map(n => <button key={n} aria-label={`${n} stars`} onClick={() => setD({ ...d, num2: d.num2 === n ? 0 : n })} style={{ border: 'none', background: 'none', fontSize: 30, color: n <= d.num2 ? 'var(--accent)' : 'var(--border)' }}>★</button>)}</div>}
       <textarea aria-label="Notes" rows={8} placeholder="Your notes and favourite lines" value={d.body} onChange={e => setD({ ...d, body: e.target.value })} style={{ width: '100%', borderRadius: 16, border: '2px solid var(--border)', padding: 12, fontSize: 16, fontFamily: 'inherit', background: 'var(--card)', color: 'var(--ink)' }} />
@@ -336,7 +337,7 @@ Format every line exactly as "Name: text" using only two first names. Then add o
       {err && <div style={{ fontSize: 15, color: 'var(--late)' }}>{err}</div>}
       {convo && (
         <div className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Seg<'read' | 'first' | 'second'> options={[['read', 'Read it'], ['first', `Practise as ${names[0]}`], ['second', `Practise as ${names[1] ?? 'B'}`]]} value={mode} onChange={m => { setMode(m); setShown(new Set()) }} />
+          <Seg<'read' | 'first' | 'second'> inner options={[['read', 'Read it'], ['first', `Practise as ${names[0]}`], ['second', `Practise as ${names[1] ?? 'B'}`]]} value={mode} onChange={m => { setMode(m); setShown(new Set()) }} />
           {convo.lines.map((l, i) => {
             const right = l.who !== names[0]; const hide = hidden(i)
             return (

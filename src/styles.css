@@ -219,3 +219,10 @@ textarea { height: auto !important; min-height: 120px; padding: 12px 14px; line-
 .habit-nudge.done .hn-cta { background: var(--faint); color: var(--ink); border: 1px solid var(--border); }
 .habit-sheet { width: min(94vw, 620px); }
 @media (max-width: 640px) { .habit-nudge { height: 68px; gap: 10px; } .hn-title { font-size: 18px; } .hn-cta { height: 44px; padding: 0 14px; font-size: 14px; } }
+
+/* Knowledge: smaller tabs inside a section are blue, so they look different from the main tabs */
+.seg-inner { align-self: flex-start; width: fit-content; background: var(--blue-bg); border: 1px solid color-mix(in srgb, var(--seg-on) 25%, transparent); }
+.seg-inner button { flex: none; white-space: nowrap; height: 36px; padding: 0 16px; border-radius: 999px; border: none; font-weight: 600; font-size: 14px; background: transparent; color: var(--blue-tx); }
+.seg-inner button.on { background: var(--seg-on); color: #fff; }
+:root { --seg-on: #4A63C2; }
+html[data-theme='warm'], html[data-theme='minimal'] { --seg-on: #2F6DB5; }
