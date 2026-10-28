@@ -609,18 +609,16 @@ function JobBoard({ edit }: { edit: boolean }) {
             </div>
           ) : (
           <div style={{ flex: '1 1 320px', minWidth: 0 }}>
-            {/* company as the heading, then the position and details, then the link to the ad, then where it is */}
-            <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.25 }}>{j.company || j.title}</div>
-            {j.company && <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{j.title}</div>}
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6, fontSize: 13, fontWeight: 600 }}>
-              {j.pay && <span style={{ color: 'var(--accent)' }}>{j.pay}</span>}
-              {workText(j.kind) && <span>{workText(j.kind)}</span>}
-              <span className="muted">{j.posted ? `Posted ${low(age(j.posted))}` : j.search === 'shared' ? `Saved ${low(age(j.first_seen))}` : ''}</span>
-              {(() => { const c = closes(j.deadline); return c && <span style={{ color: c.soon ? 'var(--late)' : c.past ? 'var(--muted)' : 'var(--ink)', fontWeight: 700 }}>{c.text}</span> })()}
-            </div>
-            <a href={j.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 14, fontWeight: 700, color: 'var(--seg-on)', textDecoration: 'none' }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6" /><path d="M20 4l-9 9" /><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5" /></svg>
-              Open on {viaOf(j.kind).replace(/^via\s*/, '') || 'the job site'}
+            {/* company as the heading, then the position and details (tap any of them to open the ad), then where it is */}
+            <a href={j.url} target="_blank" rel="noopener noreferrer" aria-label={`Open the ad: ${j.title}${j.company ? ' at ' + j.company : ''}`} className="job-open" style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
+              <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.25 }}>{j.company || j.title}</div>
+              {j.company && <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{j.title}</div>}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6, fontSize: 13, fontWeight: 600 }}>
+                {j.pay && <span style={{ color: 'var(--accent)' }}>{j.pay}</span>}
+                {workText(j.kind) && <span>{workText(j.kind)}</span>}
+                <span className="muted">{j.posted ? `Posted ${low(age(j.posted))}` : j.search === 'shared' ? `Saved ${low(age(j.first_seen))}` : ''}</span>
+                {(() => { const c = closes(j.deadline); return c && <span style={{ color: c.soon ? 'var(--late)' : c.past ? 'var(--muted)' : 'var(--ink)', fontWeight: 700 }}>{c.text}</span> })()}
+              </div>
             </a>
             {(j.place || j.address) && <div style={{ marginTop: 6, display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 14 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none', marginTop: 2, color: 'var(--accent)' }}><path d="M12 21s-7-6.2-7-11.5A7 7 0 0119 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>

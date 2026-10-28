@@ -295,3 +295,5 @@ html[data-theme='warm'], html[data-theme='minimal'] { --seg-on: #2F6DB5; }
 .ot-reminders { --c: #B4651C; }
 .ot-products { --c: #2E7F6F; }
 html[data-mode='dark'] .ot:not(.on) { color: color-mix(in srgb, var(--c) 45%, #fff); }
+
+.job-open:active { opacity: .6; }
